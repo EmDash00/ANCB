@@ -1,0 +1,1402 @@
+from numpy import ndarray, asarray, empty  # type: ignore
+from typing import Tuple
+from typing import Union
+
+from functools import reduce
+from itertools import zip_longest, starmap
+
+from numpy import (
+    matmul, add, subtract, multiply, divide, mod, floor_divide, power,
+    negative, positive, absolute,
+    right_shift, left_shift, bitwise_and, invert, bitwise_or, bitwise_xor
+)
+
+
+def can_broadcast(shape1, shape2) -> bool:
+    """
+    Check if shapes shape1 and shape2 can be broadcast together.
+
+    :param Tuple arr1:
+    :param Tuple arr2:
+
+    :returns: True if arr1 and arr2 can be broadcast together, False
+    otherwise
+
+    :rtype: bool
+    """
+    return(
+        reduce(
+            lambda a, b: a and b,
+            starmap(
+                lambda a, b: (a == b or (a == 1 or b == 1)),
+                zip_longest(shape1, shape2, fillvalue=1)
+            )
+        )
+    )
+
+
+def star_can_broadcast(starexpr) -> bool:
+    """
+    Check if shapes shape1 and shape2 can be broadcast together from a
+    tuple of zip_longest(shape1, shape2, fillvalue=1) called the "starexpr"
+
+    :param Tuple starexpr:
+
+    :returns: True if shape1 and shape 2can be broadcast together, False
+    otherwise
+
+    :rtype: bool
+    """
+
+    return (
+        reduce(
+            lambda a, b: a and b,
+            starmap(
+                lambda a, b: (a == b or (a == 1 or b == 1)),
+                starexpr
+            )
+        )
+    )
+
+
+class CircularBuffer(ndarray):
+    """
+    Implements a circular (ring) buffer using a numpy array. This
+    implmentation uses an internal size count and capacity count so that
+    the data region is fully utilized.
+    """
+    def _binary_operator(op):
+        def operator_func(self, x):
+            x = asarray(x)
+
+            self_shape = (self._size, *self.shape[1:])
+            starexpr = tuple(zip_longest(self_shape, x.shape, fillvalue=1))
+
+            if star_can_broadcast(starexpr):
+                out = empty(tuple(starmap(lambda a, b: max(a, b), starexpr)))
+
+                if self.fragmented:
+                    k = self._capacity - self._begin  # fragmentation index
+                    if x.ndim >= 1:
+                        op(self[self._begin:], x[:k], out[:k])
+                        op(self[:self._end], x[k:], out[k:])
+                    else:
+                        op(self[self._begin:], x, out[:k])
+                        op(self[:self._end], x, out[k:])
+
+                else:
+                    if self._begin < self._end:
+                        part = self[self._begin:self._end]
+                    elif self._end == 0:
+                        part = self[self._begin:]
+
+                    op(part, x, out)
+
+                return(out.view(ndarray))
+            else:
+                raise ValueError(
+                    "operands could not be broadcast "
+                    "together with shapes {} {}".format(
+                        (self._size, *self.shape[1:]),
+                        x.shape
+                    )
+                )
+
+        return operator_func
+
+    def _binary_roperator(op):
+        def roperator_func(self, x):
+            x = asarray(x)
+
+            self_shape = (self._size, *self.shape[1:])
+            starexpr = tuple(zip_longest(self_shape, x.shape, fillvalue=1))
+
+            if star_can_broadcast(starexpr):
+                out = empty(tuple(starmap(lambda a, b: max(a, b), starexpr)))
+
+                if self.fragmented:
+                    k = self._capacity - self._begin  # fragmentation index
+
+                    if x.ndim >= 1:
+                        op(x[:k], self[self._begin:], out[:k])
+                        op(x[k:], self[:self._end], out[k:])
+                    else:
+                        op(x, self[self._begin:], out[:k])
+                        op(x, self[:self._end], out[k:])
+
+                else:
+                    if self._begin < self._end:
+                        part = self[self._begin:self._end]
+                    elif self._end == 0:
+                        part = self[self._begin:]
+
+                    op(x, part, out)
+
+                return(out.view(ndarray))
+            else:
+                raise ValueError(
+                    "operands could not be broadcast"
+                    "together with shapes {} {}".format(
+                        x.shape,
+                        (self._size, *self.shape[1:])
+                    )
+                )
+
+        return roperator_func
+
+    def _unary_operator(op):
+        def operator_func(self, x):
+            out = empty((self._size, *self.shape[1:]))
+
+            if self.fragmented:
+                k = self._capacity - self._begin  # fragmentation index
+
+                op(self[self._begin:], out[:k])
+                op(self[:self._end], out[k:])
+                return(out.view(ndarray))
+            else:
+                if self._begin < self._end:
+                    part = self[self._begin:self._end]
+                elif self._end == 0:
+                    part = self[self._begin:]
+
+                op(part, out)
+                return(out.view(ndarray))
+
+        return operator_func
+
+    def _ioperator(op):
+        def operator_func(self, x):
+            x = asarray(x)
+
+            self_shape = (self._size, *self.shape[1:])
+            starexpr = tuple(zip_longest(self_shape, x, fillvalue=1))
+
+            if star_can_broadcast(starexpr):
+
+                if self.fragmented:
+                    k = self._capacity - self._begin  # fragmentation index
+
+                    op(self[self._begin:], x[:k], self[self._begin])
+                    op(self[:self._end], x[:k], self[:self._end])
+                else:
+                    if self._begin < self._end:
+                        part = self[self._begin:self._end]
+                    elif self._end == 0:
+                        part = self[self._begin:]
+
+                    op(part, x, part)
+            else:
+
+                raise ValueError(
+                    "operands could not be broadcast"
+                    "together with shapes {} {}".format(
+                        (self._size, *self.shape[1:]),
+                        x.shape
+                    )
+                )
+
+    def __new__(cls, data, bounds: Tuple[int, int] = (0, 0)):
+        """
+        Generate a circular buffer over existing array. The dimension 0 is
+        used to index elements of the buffer.
+
+        For example, for an ndim array of shape (N, a, b, c), the size of the
+        buffer is interpretted to be N and the elements are arrays of shape
+        (a, b, c).
+
+        :param data: Data backing the buffer. Interpretted as a numpy array.
+
+        :param Tuple[int, int] bounds: tuple of (begin, end) indices expressing
+        where the buffer begins and ends over the data. For example, for a
+        buffer [0, 1, 2, -1, -1] choosing (0, 2) would say [0, 1, 2] is in the
+        buffer. For [1, 2, -1, -1, 0] choosing (4, 2) would select [0, 1, 2].
+        """
+        obj = asarray(data).view(cls)
+
+        obj._begin = bounds[0]
+        obj._end = bounds[1]
+        obj._capacity = obj.shape[0]
+
+        if (obj._begin < obj._end):
+            obj._size = (obj._end - obj._begin) + 1
+        elif (obj._begin > obj._end):
+            # ((obj._capacity - 1) - obj._begin) + obj._end + 1
+            obj._size = obj._capacity - obj._begin + obj._end
+        else:
+            obj._size = 0
+
+        return (obj)
+
+    def __init__(self, *args, **kwargs):
+        # This is here for typing info for linters, not anything else
+        super().__init__()
+        self._begin: int
+        self._end: int
+        self._capacity: int
+
+    def __matmul__(self, x):
+        x = asarray(x)
+
+        if x.ndim == 0:
+            raise ValueError(
+                "matmul: Input operand 1 does not have enough dimensions "
+                "(has 0, gufunc core with signature (n?,k),(k,m?)->(n?,m?)"
+                " requires 1)"
+            )
+
+        s = x.shape[-2] if x.ndim > 1 else x.shape[-1]
+
+        if (self.shape[-1] == s):
+
+            self_shape = (self._size, *self.shape[1:-2])
+            starexpr = tuple(zip_longest(self_shape, x.shape, fillvalue=1))
+
+            if star_can_broadcast(starexpr):
+                broadcast_shape = tuple(
+                    starmap(
+                        lambda a, b: max(a, b),
+                        starexpr
+                    )
+                )
+
+                out = empty((*broadcast_shape, self.shape[-1], x.shape[-2]))
+
+                if self.fragmented:
+
+                    if self.ndim > 2:
+                        k = self._capacity - self._begin  # fragmentation index
+
+                        matmul(self[self._begin:], x[:k], out[:k])
+                        matmul(self[:self._end], x[k:], out[k:])
+
+                        # out[:k] = self[self._begin:] @ x[:k]
+                        # out[k:] = self[:self._end] @ x[k:]
+                    elif self.ndim == 2:
+                        k = self._capacity - self._begin  # fragmentation index
+
+                        matmul(self[self._begin:], x, out[..., :k, :])
+                        matmul(self[:self._end], x, out[..., k:, :])
+
+                        # out[..., :k, :] = self[self._begin:] @ x
+                        # out[..., k:, :] = self[:self._end] @ x
+                    else:
+                        # you really can't optimize further than this.
+                        matmul(self[self._begin:], x[..., :k, :], out)
+                        out += self[:self._end] @ x[..., k:, :]
+
+                else:
+                    out = matmul(self[self._begin:self._end], x, out)
+
+                return(out.view(ndarray))
+            else:
+                print(
+                    (
+                        "operands could not be broadcast together with"
+                        "remapped shapes [original->remapped]: "
+                        "{shape_b}->({shape_bn}newaxis,newaxis) "
+                        "{shape_a}->({shape_an}newaxis,newaxis) "
+                        "and requested shape ({n},{m})"
+                    ).format(
+                        shape_a=self.shape,
+                        shape_b=x.shape,
+                        shape_an=self.shape[:-2],
+                        shape_bn=x.shape[:-2],
+                        n=self.shape[-1],
+                        m=x.shape[-2]
+                    )
+                )
+        else:
+            print(
+                (
+                    "matmul: Input operand 1 has a mismatch in its core "
+                    "dimension 0, with gufunc signature (n?,k),(k,m?)->(n?,m?)"
+                    " (size {n} is different from {m})"
+                ).format(
+                    n=self.shape[-1],
+                    m=x.shape[-2]
+                )
+            )
+
+    def __rmatmul__(self, x):
+        x = asarray(x)
+
+        if (x.ndim == 0):
+            ValueError(
+                "matmul: Input operand 1 does not have enough dimensions "
+                "(has 0, gufunc core with signature (n?,k),(k,m?)->(n?,m?) "
+                "requires 1"
+            )
+
+        if x.ndim == 1 and self.ndim == 1:
+            # Dot product
+            if x.shape[0] == self._size:
+                if self.fragmented:
+                    k = self._capacity - self._begin  # fragmentation index
+
+                    out = matmul(x[:k], self[self._begin:])
+                    out += matmul(x[k:], self[:self._end])
+                else:
+                    if self._begin < self._end:
+                        part = self[self._begin:self._end]
+                    elif self._end == 0:
+                        part = self[self._begin:]
+
+                    matmul(x, part, out)
+
+                return(out)
+            else:
+                raise ValueError(
+                    "matmul: Input operand 1 has a mismatch in its core "
+                    "dimension 0, with gufunc signature (n?,k),(k,m?)->(n?,m?)"
+                    " (size {n} is different from {m})".format(
+                        n=self._size,
+                        m=x.shape[0]
+                    )
+                )
+        elif x.ndim == 1 and self.ndim > 1:
+            if x.shape[0] == self.shape[-2]:
+                if self.ndim == 2:
+                    out = empty(self.shape[-1])
+
+                    if self.fragmented:
+                        k = self._capacity - self._begin  # fragmentation index
+
+                        matmul(x[:k], self[self._begin:], out)
+                        out += matmul(x[k:], self[:self._end])
+                    else:
+                        if self._begin < self._end:
+                            part = self[self._begin:self._end]
+                        elif self._end == 0:
+                            part = self[self._begin:]
+
+                        matmul(x, part, out)
+
+                    return(out)
+                else:
+                    out = empty(
+                        (self._size, *self.shape[1:-2], self.shape[-1])
+                    )
+
+                    if self.fragmented:
+                        k = self._capacity - self._begin  # fragmentation index
+
+                        matmul(x[k:], self[self._begin:], out[k:])
+                        matmul(x[:k], self[:self._end], out[:k])
+                    else:
+                        if self._begin < self._end:
+                            part = self[self._begin:self._end]
+                        elif self._end == 0:
+                            part = self[self._begin:]
+
+                        matmul(x, part, out)
+
+                    return(out)
+            else:
+                raise ValueError(
+                    "matmul: Input operand 1 has a mismatch in its core "
+                    "dimension 0, with gufunc signature (n?,k),(k,m?)->(n?,m?)"
+                    " (size {n} is different from {m})".format(
+                        n=self.shape[-2],
+                        m=x.shape[0]
+                    )
+                )
+        elif x.ndim > 1 and self.ndim == 1:
+            if x.shape[-1] == self.shape[0]:
+                out = empty(x.shape[:-1])
+                if self.fragmented:
+                    k = self._capacity - self._begin  # fragmentation index
+
+                    matmul(x[..., :, :k], self[self._begin:], out)
+                    out += matmul(x[..., :, k:], self[:self._end])
+                else:
+                    if self._begin < self._end:
+                        part = self[self._begin:self._end]
+                    elif self._end == 0:
+                        part = self[self._begin:]
+
+                    matmul(x, part, out)
+
+                return(out)
+            else:
+                raise ValueError(
+                    "matmul: Input operand 1 has a mismatch in its core "
+                    "dimension 0, with gufunc signature (n?,k),(k,m?)->(n?,m?)"
+                    " (size {n} is different from {m})".format(
+                        n=self.shape[-2],
+                        m=x.shape[0]
+                    )
+                )
+        elif self.ndim == 2:
+            if (x.shape[-1] == self.shape[-2]):
+                out = empty(
+                    (*x.shape[:-1], self.shape[-2])
+                )
+
+                if self.fragmented:
+                    k = self._capacity - self._begin  # fragmentation index
+
+                    matmul(x[..., :, :k], self[self._begin:], out)
+                    out += matmul(x[..., :, k:], self[:self._end])
+
+                else:
+                    if self._begin < self._end:
+                        part = self[self._begin:self._end]
+                    elif self._end == 0:
+                        part = self[self._begin:]
+
+                    matmul(x, part, out)
+
+                return(out.view(ndarray))
+
+            else:
+                raise ValueError(
+                    (
+                        "matmul: Input operand 1 has a mismatch in its core "
+                        "dimension 0, with gufunc signature (n?,k),(k,m?)->"
+                        "(n?,m?) (size {n} is different from {m})"
+                    ).format(
+                        n=self.shape[-1],
+                        m=x.shape[-2]
+                    )
+                )
+        else:
+            if (x.shape[-1] == self.shape[-2]):
+                self_shape = (self._size, *self.shape[1:-2])
+
+                starexpr = tuple(
+                    zip_longest(self_shape, x.shape[:-2], fillvalue=1)
+                )
+                if star_can_broadcast(starexpr):
+                    broadcast_shape = tuple(
+                        starmap(
+                            lambda a, b: max(a, b),
+                            starexpr
+                        )
+                    )
+
+                    out = empty(
+                        (*broadcast_shape, x.shape[-1], self.shape[-2])
+                    )
+
+                    if self.fragmented:
+                        k = self._capacity - self._begin  # fragmentation index
+
+                        matmul(x[:k], self[self._begin:], out[:k])
+                        matmul(x[k:], self[:self._end], out[k:])
+                    else:
+                        if self._begin < self._end:
+                            part = self[self._begin:self._end]
+                        elif self._end == 0:
+                            part = self[self._begin:]
+
+                        matmul(x, part, out)
+
+                    return(out.view(ndarray))
+                else:
+                    print(
+                        (
+                            "operands could not be broadcast together with"
+                            "remapped shapes [original->remapped]: "
+                            "{shape_b}->({shape_bn}, newaxis,newaxis) "
+                            "{shape_a}->({shape_an}, newaxis,newaxis) "
+                            "and requested shape ({n},{m})"
+                        ).format(
+                            shape_a=self_shape,
+                            shape_b=x.shape,
+                            shape_an=self.shape[:-2].__str__()[:-1],
+                            shape_bn=x.shape[:-2].__str__()[:-1],
+                            n=self.shape[-1],
+                            m=x.shape[-2]
+                        )
+                    )
+            else:
+                raise ValueError(
+                    (
+                        "matmul: Input operand 1 has a mismatch in its core "
+                        "dimension 0, with gufunc signature (n?,k),(k,m?)->"
+                        "(n?,m?) (size {n} is different from {m})"
+                    ).format(
+                        n=self.shape[-1],
+                        m=x.shape[-2]
+                    )
+                )
+
+    def get_partions(self) -> Union[ndarray, Tuple[ndarray, ndarray]]:
+        """
+        Gets a slice of the buffer between the beginning and end indices.
+        If the buffer is fragmented, a tuple of two slices of the two
+        fragments sequentially. Concatenating the slices in the order they are
+        in the tuple will return a list of elements in the correct order.
+
+        Time complexity: O(1)
+
+        :returns: slice or tuple of slices of the array elements in order
+        :rtype: Union[ndarray, Tuple[ndarray, ndarray]]
+        """
+        if self.fragmented:
+            return (self[self._begin:], self[:self._end])
+        else:
+            return self[self._begin:self._end]
+
+    def __add__(self, x):
+        x = asarray(x)
+
+        self_shape = (self._size, *self.shape[1:])
+        starexpr = tuple(zip_longest(self_shape, x.shape, fillvalue=1))
+
+        if star_can_broadcast(starexpr):
+            out = empty(tuple(starmap(lambda a, b: max(a, b), starexpr)))
+
+            if self.fragmented:
+                k = self._capacity - self._begin  # fragmentation index
+                if x.ndim >= 1:
+                    add(self[self._begin:], x[:k], out[:k])
+                    add(self[:self._end], x[k:], out[k:])
+                else:
+                    add(self[self._begin:], x, out[:k])
+                    add(self[:self._end], x, out[k:])
+
+            else:
+                if self._begin < self._end:
+                    part = self[self._begin:self._end]
+                elif self._end == 0:
+                    part = self[self._begin:]
+
+                add(part, x, out)
+
+            return(out.view(ndarray))
+        else:
+            raise ValueError(
+                "operands could not be broadcast "
+                "together with shapes {} {}".format(
+                    (self._size, *self.shape[1:]),
+                    x.shape
+                )
+            )
+
+    def __radd__(self, x):
+        x = asarray(x)
+
+        self_shape = (self._size, *self.shape[1:])
+        starexpr = tuple(zip_longest(self_shape, x.shape, fillvalue=1))
+
+        if star_can_broadcast(starexpr):
+            out = empty(tuple(starmap(lambda a, b: max(a, b), starexpr)))
+
+            if self.fragmented:
+                k = self._capacity - self._begin  # fragmentation index
+
+                if x.ndim >= 1:
+                    add(x[:k], self[self._begin:], out[:k])
+                    add(x[k:], self[:self._end], out[k:])
+                else:
+                    add(x, self[self._begin:], out[:k])
+                    add(x, self[:self._end], out[k:])
+
+            else:
+                if self._begin < self._end:
+                    part = self[self._begin:self._end]
+                elif self._end == 0:
+                    part = self[self._begin:]
+
+                add(x, part, out)
+
+            return(out.view(ndarray))
+        else:
+            raise ValueError(
+                "operands could not be broadcast"
+                "together with shapes {} {}".format(
+                    x.shape,
+                    (self._size, *self.shape[1:])
+                )
+            )
+
+    def __sub__(self, x):
+        x = asarray(x)
+
+        self_shape = (self._size, *self.shape[1:])
+        starexpr = tuple(zip_longest(self_shape, x.shape, fillvalue=1))
+
+        if star_can_broadcast(starexpr):
+            out = empty(tuple(starmap(lambda a, b: max(a, b), starexpr)))
+
+            if self.fragmented:
+                k = self._capacity - self._begin  # fragmentation index
+                if x.ndim >= 1:
+                    subtract(self[self._begin:], x[:k], out[:k])
+                    subtract(self[:self._end], x[k:], out[k:])
+                else:
+                    subtract(self[self._begin:], x, out[:k])
+                    subtract(self[:self._end], x, out[k:])
+
+            else:
+                if self._begin < self._end:
+                    part = self[self._begin:self._end]
+                elif self._end == 0:
+                    part = self[self._begin:]
+
+                subtract(part, x, out)
+
+            return(out.view(ndarray))
+        else:
+            raise ValueError(
+                "operands could not be broadcast "
+                "together with shapes {} {}".format(
+                    (self._size, *self.shape[1:]),
+                    x.shape
+                )
+            )
+
+    def __rsub__(self, x):
+        x = asarray(x)
+
+        self_shape = (self._size, *self.shape[1:])
+        starexpr = tuple(zip_longest(self_shape, x.shape, fillvalue=1))
+
+        if star_can_broadcast(starexpr):
+            out = empty(tuple(starmap(lambda a, b: max(a, b), starexpr)))
+
+            if self.fragmented:
+                k = self._capacity - self._begin  # fragmentation index
+
+                if x.ndim >= 1:
+                    subtract(x[:k], self[self._begin:], out[:k])
+                    subtract(x[k:], self[:self._end], out[k:])
+                else:
+                    subtract(x, self[self._begin:], out[:k])
+                    subtract(x, self[:self._end], out[k:])
+
+            else:
+                if self._begin < self._end:
+                    part = self[self._begin:self._end]
+                elif self._end == 0:
+                    part = self[self._begin:]
+
+                subtract(x, part, out)
+
+            return(out.view(ndarray))
+        else:
+            raise ValueError(
+                "operands could not be broadcast"
+                "together with shapes {} {}".format(
+                    x.shape,
+                    (self._size, *self.shape[1:])
+                )
+            )
+
+    def __mul__(self, x):
+        x = asarray(x)
+
+        self_shape = (self._size, *self.shape[1:])
+        starexpr = tuple(zip_longest(self_shape, x.shape, fillvalue=1))
+
+        if star_can_broadcast(starexpr):
+            out = empty(tuple(starmap(lambda a, b: max(a, b), starexpr)))
+
+            if self.fragmented:
+                k = self._capacity - self._begin  # fragmentation index
+                if x.ndim >= 1:
+                    multiply(self[self._begin:], x[:k], out[:k])
+                    multiply(self[:self._end], x[k:], out[k:])
+                else:
+                    multiply(self[self._begin:], x, out[:k])
+                    multiply(self[:self._end], x, out[k:])
+
+            else:
+                if self._begin < self._end:
+                    part = self[self._begin:self._end]
+                elif self._end == 0:
+                    part = self[self._begin:]
+
+                multiply(part, x, out)
+
+            return(out.view(ndarray))
+        else:
+            raise ValueError(
+                "operands could not be broadcast "
+                "together with shapes {} {}".format(
+                    (self._size, *self.shape[1:]),
+                    x.shape
+                )
+            )
+
+    def __rmul__(self, x):
+        x = asarray(x)
+
+        self_shape = (self._size, *self.shape[1:])
+        starexpr = tuple(zip_longest(self_shape, x.shape, fillvalue=1))
+
+        if star_can_broadcast(starexpr):
+            out = empty(tuple(starmap(lambda a, b: max(a, b), starexpr)))
+
+            if self.fragmented:
+                k = self._capacity - self._begin  # fragmentation index
+
+                if x.ndim >= 1:
+                    multiply(x[:k], self[self._begin:], out[:k])
+                    multiply(x[k:], self[:self._end], out[k:])
+                else:
+                    multiply(x, self[self._begin:], out[:k])
+                    multiply(x, self[:self._end], out[k:])
+
+            else:
+                if self._begin < self._end:
+                    part = self[self._begin:self._end]
+                elif self._end == 0:
+                    part = self[self._begin:]
+
+                multiply(x, part, out)
+
+            return(out.view(ndarray))
+        else:
+            raise ValueError(
+                "operands could not be broadcast"
+                "together with shapes {} {}".format(
+                    x.shape,
+                    (self._size, *self.shape[1:])
+                )
+            )
+
+    def __truediv__(self, x):
+        x = asarray(x)
+
+        self_shape = (self._size, *self.shape[1:])
+        starexpr = tuple(zip_longest(self_shape, x.shape, fillvalue=1))
+
+        if star_can_broadcast(starexpr):
+            out = empty(tuple(starmap(lambda a, b: max(a, b), starexpr)))
+
+            if self.fragmented:
+                k = self._capacity - self._begin  # fragmentation index
+                if x.ndim >= 1:
+                    divide(self[self._begin:], x[:k], out[:k])
+                    divide(self[:self._end], x[k:], out[k:])
+                else:
+                    divide(self[self._begin:], x, out[:k])
+                    divide(self[:self._end], x, out[k:])
+
+            else:
+                if self._begin < self._end:
+                    part = self[self._begin:self._end]
+                elif self._end == 0:
+                    part = self[self._begin:]
+
+                divide(part, x, out)
+
+            return(out.view(ndarray))
+        else:
+            raise ValueError(
+                "operands could not be broadcast "
+                "together with shapes {} {}".format(
+                    (self._size, *self.shape[1:]),
+                    x.shape
+                )
+            )
+
+    def __rtruediv__(self, x):
+        x = asarray(x)
+
+        self_shape = (self._size, *self.shape[1:])
+        starexpr = tuple(zip_longest(self_shape, x.shape, fillvalue=1))
+
+        if star_can_broadcast(starexpr):
+            out = empty(tuple(starmap(lambda a, b: max(a, b), starexpr)))
+
+            if self.fragmented:
+                k = self._capacity - self._begin  # fragmentation index
+
+                if x.ndim >= 1:
+                    divide(x[:k], self[self._begin:], out[:k])
+                    divide(x[k:], self[:self._end], out[k:])
+                else:
+                    divide(x, self[self._begin:], out[:k])
+                    divide(x, self[:self._end], out[k:])
+
+            else:
+                if self._begin < self._end:
+                    part = self[self._begin:self._end]
+                elif self._end == 0:
+                    part = self[self._begin:]
+
+                multiply(x, part, out)
+
+            return(out.view(ndarray))
+        else:
+            raise ValueError(
+                "operands could not be broadcast"
+                "together with shapes {} {}".format(
+                    x.shape,
+                    (self._size, *self.shape[1:])
+                )
+            )
+
+    def __floordiv__(self, x):
+        x = asarray(x)
+
+        self_shape = (self._size, *self.shape[1:])
+        starexpr = tuple(zip_longest(self_shape, x.shape, fillvalue=1))
+
+        if star_can_broadcast(starexpr):
+            out = empty(tuple(starmap(lambda a, b: max(a, b), starexpr)))
+
+            if self.fragmented:
+                k = self._capacity - self._begin  # fragmentation index
+                if x.ndim >= 1:
+                    floor_divide(self[self._begin:], x[:k], out[:k])
+                    floor_divide(self[:self._end], x[k:], out[k:])
+                else:
+                    floor_divide(self[self._begin:], x, out[:k])
+                    floor_divide(self[:self._end], x, out[k:])
+
+            else:
+                if self._begin < self._end:
+                    part = self[self._begin:self._end]
+                elif self._end == 0:
+                    part = self[self._begin:]
+
+                floor_divide(part, x, out)
+
+            return(out.view(ndarray))
+        else:
+            raise ValueError(
+                "operands could not be broadcast "
+                "together with shapes {} {}".format(
+                    (self._size, *self.shape[1:]),
+                    x.shape
+                )
+            )
+
+    def __rfloordiv__(self, x):
+        x = asarray(x)
+
+        self_shape = (self._size, *self.shape[1:])
+        starexpr = tuple(zip_longest(self_shape, x.shape, fillvalue=1))
+
+        if star_can_broadcast(starexpr):
+            out = empty(tuple(starmap(lambda a, b: max(a, b), starexpr)))
+
+            if self.fragmented:
+                k = self._capacity - self._begin  # fragmentation index
+
+                if x.ndim >= 1:
+                    floor_divide(x[:k], self[self._begin:], out[:k])
+                    floor_divide(x[k:], self[:self._end], out[k:])
+                else:
+                    floor_divide(x, self[self._begin:], out[:k])
+                    floor_divide(x, self[:self._end], out[k:])
+
+            else:
+                if self._begin < self._end:
+                    part = self[self._begin:self._end]
+                elif self._end == 0:
+                    part = self[self._begin:]
+
+                floor_divide(x, part, out)
+
+            return(out.view(ndarray))
+        else:
+            raise ValueError(
+                "operands could not be broadcast"
+                "together with shapes {} {}".format(
+                    x.shape,
+                    (self._size, *self.shape[1:])
+                )
+            )
+
+    def __divmod__(self, x):
+        x = asarray(x)
+
+        self_shape = (self._size, *self.shape[1:])
+        starexpr = tuple(zip_longest(self_shape, x.shape, fillvalue=1))
+
+        if star_can_broadcast(starexpr):
+            out = empty(tuple(starmap(lambda a, b: max(a, b), starexpr)))
+
+            if self.fragmented:
+                k = self._capacity - self._begin  # fragmentation index
+                if x.ndim >= 1:
+                    mod(self[self._begin:], x[:k], out[:k])
+                    mod(self[:self._end], x[k:], out[k:])
+                else:
+                    mod(self[self._begin:], x, out[:k])
+                    mod(self[:self._end], x, out[k:])
+
+            else:
+                if self._begin < self._end:
+                    part = self[self._begin:self._end]
+                elif self._end == 0:
+                    part = self[self._begin:]
+
+                mod(part, x, out)
+
+            return(out.view(ndarray))
+        else:
+            raise ValueError(
+                "operands could not be broadcast "
+                "together with shapes {} {}".format(
+                    (self._size, *self.shape[1:]),
+                    x.shape
+                )
+            )
+
+    def __rdivmod__(self, x):
+        x = asarray(x)
+
+        self_shape = (self._size, *self.shape[1:])
+        starexpr = tuple(zip_longest(self_shape, x.shape, fillvalue=1))
+
+        if star_can_broadcast(starexpr):
+            out = empty(tuple(starmap(lambda a, b: max(a, b), starexpr)))
+
+            if self.fragmented:
+                k = self._capacity - self._begin  # fragmentation index
+
+                if x.ndim >= 1:
+                    mod(x[:k], self[self._begin:], out[:k])
+                    mod(x[k:], self[:self._end], out[k:])
+                else:
+                    mod(x, self[self._begin:], out[:k])
+                    mod(x, self[:self._end], out[k:])
+
+            else:
+                if self._begin < self._end:
+                    part = self[self._begin:self._end]
+                elif self._end == 0:
+                    part = self[self._begin:]
+
+                mod(x, part, out)
+
+            return(out.view(ndarray))
+        else:
+            raise ValueError(
+                "operands could not be broadcast"
+                "together with shapes {} {}".format(
+                    x.shape,
+                    (self._size, *self.shape[1:])
+                )
+            )
+
+    def __pow__(self, x):
+        x = asarray(x)
+
+        self_shape = (self._size, *self.shape[1:])
+        starexpr = tuple(zip_longest(self_shape, x.shape, fillvalue=1))
+
+        if star_can_broadcast(starexpr):
+            out = empty(tuple(starmap(lambda a, b: max(a, b), starexpr)))
+
+            if self.fragmented:
+                k = self._capacity - self._begin  # fragmentation index
+                if x.ndim >= 1:
+                    power(self[self._begin:], x[:k], out[:k])
+                    power(self[:self._end], x[k:], out[k:])
+                else:
+                    power(self[self._begin:], x, out[:k])
+                    power(self[:self._end], x, out[k:])
+
+            else:
+                if self._begin < self._end:
+                    part = self[self._begin:self._end]
+                elif self._end == 0:
+                    part = self[self._begin:]
+
+                power(part, x, out)
+
+            return(out.view(ndarray))
+        else:
+            raise ValueError(
+                "operands could not be broadcast "
+                "together with shapes {} {}".format(
+                    (self._size, *self.shape[1:]),
+                    x.shape
+                )
+            )
+
+    def __rpower__(self, x):
+        x = asarray(x)
+
+        self_shape = (self._size, *self.shape[1:])
+        starexpr = tuple(zip_longest(self_shape, x.shape, fillvalue=1))
+
+        if star_can_broadcast(starexpr):
+            out = empty(tuple(starmap(lambda a, b: max(a, b), starexpr)))
+
+            if self.fragmented:
+                k = self._capacity - self._begin  # fragmentation index
+
+                if x.ndim >= 1:
+                    power(x[:k], self[self._begin:], out[:k])
+                    power(x[k:], self[:self._end], out[k:])
+                else:
+                    power(x, self[self._begin:], out[:k])
+                    power(x, self[:self._end], out[k:])
+
+            else:
+                if self._begin < self._end:
+                    part = self[self._begin:self._end]
+                elif self._end == 0:
+                    part = self[self._begin:]
+
+                power(x, part, out)
+
+            return(out.view(ndarray))
+        else:
+            raise ValueError(
+                "operands could not be broadcast"
+                "together with shapes {} {}".format(
+                    x.shape,
+                    (self._size, *self.shape[1:])
+                )
+            )
+
+    def __and__(self, x):
+        x = asarray(x)
+
+        self_shape = (self._size, *self.shape[1:])
+        starexpr = tuple(zip_longest(self_shape, x.shape, fillvalue=1))
+
+        if star_can_broadcast(starexpr):
+            out = empty(tuple(starmap(lambda a, b: max(a, b), starexpr)))
+
+            if self.fragmented:
+                k = self._capacity - self._begin  # fragmentation index
+                if x.ndim >= 1:
+                    bitwise_and(self[self._begin:], x[:k], out[:k])
+                    bitwise_and(self[:self._end], x[k:], out[k:])
+                else:
+                    bitwise_and(self[self._begin:], x, out[:k])
+                    bitwise_and(self[:self._end], x, out[k:])
+            else:
+                if self._begin < self._end:
+                    part = self[self._begin:self._end]
+                elif self._end == 0:
+                    part = self[self._begin:]
+
+                bitwise_and(part, x, out)
+
+            return(out.view(ndarray))
+        else:
+            raise ValueError(
+                "operands could not be broadcast "
+                "together with shapes {} {}".format(
+                    (self._size, *self.shape[1:]),
+                    x.shape
+                )
+            )
+
+    def __or__(self, x):
+        x = asarray(x)
+
+        self_shape = (self._size, *self.shape[1:])
+        starexpr = tuple(zip_longest(self_shape, x.shape, fillvalue=1))
+
+        if star_can_broadcast(starexpr):
+            out = empty(tuple(starmap(lambda a, b: max(a, b), starexpr)))
+
+            if self.fragmented:
+                k = self._capacity - self._begin  # fragmentation index
+
+                if x.ndim >= 1:
+                    bitwise_or(x[:k], self[self._begin:], out[:k])
+                    bitwise_or(x[k:], self[:self._end], out[k:])
+                else:
+                    bitwise_or(x, self[self._begin:], out[:k])
+                    bitwise_or(x, self[:self._end], out[k:])
+
+            else:
+                if self._begin < self._end:
+                    part = self[self._begin:self._end]
+                elif self._end == 0:
+                    part = self[self._begin:]
+
+                bitwise_or(x, part, out)
+
+            return(out.view(ndarray))
+        else:
+            raise ValueError(
+                "operands could not be broadcast"
+                "together with shapes {} {}".format(
+                    x.shape,
+                    (self._size, *self.shape[1:])
+                )
+            )
+
+    def __xor__(self, x):
+        x = asarray(x)
+
+        self_shape = (self._size, *self.shape[1:])
+        starexpr = tuple(zip_longest(self_shape, x.shape, fillvalue=1))
+
+        if star_can_broadcast(starexpr):
+            out = empty(tuple(starmap(lambda a, b: max(a, b), starexpr)))
+
+            if self.fragmented:
+                k = self._capacity - self._begin  # fragmentation index
+
+                if x.ndim >= 1:
+                    bitwise_xor(x[:k], self[self._begin:], out[:k])
+                    bitwise_xor(x[k:], self[:self._end], out[k:])
+                else:
+                    bitwise_xor(x, self[self._begin:], out[:k])
+                    bitwise_xor(x, self[:self._end], out[k:])
+
+            else:
+                if self._begin < self._end:
+                    part = self[self._begin:self._end]
+                elif self._end == 0:
+                    part = self[self._begin:]
+
+                bitwise_xor(x, part, out)
+
+            return(out.view(ndarray))
+        else:
+            raise ValueError(
+                "operands could not be broadcast"
+                "together with shapes {} {}".format(
+                    x.shape,
+                    (self._size, *self.shape[1:])
+                )
+            )
+
+    def __rshift__(self, x):
+        x = asarray(x)
+
+        self_shape = (self._size, *self.shape[1:])
+        starexpr = tuple(zip_longest(self_shape, x.shape, fillvalue=1))
+
+        if star_can_broadcast(starexpr):
+            out = empty(tuple(starmap(lambda a, b: max(a, b), starexpr)))
+
+            if self.fragmented:
+                k = self._capacity - self._begin  # fragmentation index
+                if x.ndim >= 1:
+                    right_shift(self[self._begin:], x[:k], out[:k])
+                    right_shift(self[:self._end], x[k:], out[k:])
+                else:
+                    right_shift(self[self._begin:], x, out[:k])
+                    right_shift(self[:self._end], x, out[k:])
+
+            else:
+                if self._begin < self._end:
+                    part = self[self._begin:self._end]
+                elif self._end == 0:
+                    part = self[self._begin:]
+
+                right_shift(part, x, out)
+
+            return(out.view(ndarray))
+        else:
+            raise ValueError(
+                "operands could not be broadcast "
+                "together with shapes {} {}".format(
+                    (self._size, *self.shape[1:]),
+                    x.shape
+                )
+            )
+
+    def __lshift__(self, x):
+        x = asarray(x)
+
+        self_shape = (self._size, *self.shape[1:])
+        starexpr = tuple(zip_longest(self_shape, x.shape, fillvalue=1))
+
+        if star_can_broadcast(starexpr):
+            out = empty(tuple(starmap(lambda a, b: max(a, b), starexpr)))
+
+            if self.fragmented:
+                k = self._capacity - self._begin  # fragmentation index
+                if x.ndim >= 1:
+                    left_shift(self[self._begin:], x[:k], out[:k])
+                    left_shift(self[:self._end], x[k:], out[k:])
+                else:
+                    left_shift(self[self._begin:], x, out[:k])
+                    left_shift(self[:self._end], x, out[k:])
+
+            else:
+                if self._begin < self._end:
+                    part = self[self._begin:self._end]
+                elif self._end == 0:
+                    part = self[self._begin:]
+
+                right_shift(part, x, out)
+
+            return(out.view(ndarray))
+        else:
+            raise ValueError(
+                "operands could not be broadcast "
+                "together with shapes {} {}".format(
+                    (self._size, *self.shape[1:]),
+                    x.shape
+                )
+            )
+
+    def __inv__(self):
+        out = empty((self._size, *self.shape[1:]))
+
+        if self.fragmented:
+            k = self._capacity - self._begin  # fragmentation index
+
+            invert(self[self._begin:], out[:k])
+            invert(self[:self._end], out[k:])
+
+        else:
+            if self._begin < self._end:
+                part = self[self._begin:self._end]
+            elif self._end == 0:
+                part = self[self._begin:]
+
+            invert(part, out)
+
+        return(out.view(ndarray))
+
+    def __abs__(self):
+        out = empty((self._size, *self.shape[1:]))
+
+        if self.fragmented:
+            k = self._capacity - self._begin  # fragmentation index
+
+            absolute(self[self._begin:], out[:k])
+            absolute(self[:self._end], out[k:])
+
+        else:
+            if self._begin < self._end:
+                part = self[self._begin:self._end]
+            elif self._end == 0:
+                part = self[self._begin:]
+
+            absolute(part, out)
+
+        return(out.view(ndarray))
+
+    def __neg__(self):
+        out = empty((self._size, *self.shape[1:]))
+
+        if self.fragmented:
+            k = self._capacity - self._begin  # fragmentation index
+
+            negative(self[self._begin:], out[:k])
+            negative(self[:self._end], out[k:])
+
+        else:
+            if self._begin < self._end:
+                part = self[self._begin:self._end]
+            elif self._end == 0:
+                part = self[self._begin:]
+
+            negative(part, out)
+
+        return(out.view(ndarray))
+
+    def __pos__(self):
+        out = empty((self._size, *self.shape[1:]))
+
+        if self.fragmented:
+            k = self._capacity - self._begin  # fragmentation index
+
+            positive(self[self._begin:], out[:k])
+            positive(self[:self._end], out[k:])
+
+        else:
+            if self._begin < self._end:
+                part = self[self._begin:self._end]
+            elif self._end == 0:
+                part = self[self._begin:]
+
+            positive(part, out)
+
+        return(out.view(ndarray))
+
+    @property
+    def fragmented(self) -> bool:
+        """
+        Property that returns True if the buffer is fragmented (the
+        beginning index is greater than the end index), False otherwise.
+
+        Time complexity: O(1)
+
+        :returns: True if buffer is fragmented, False otherwise.
+        :rtype: bool
+        """
+        return not (
+            self._begin < self._end or
+            self._end == 0
+        )
+
+    @property
+    def full(self) -> bool:
+        """
+        Property that returns True if the buffer is full, False otherwise.
+
+        Time complexity: O(1)
+
+        :returns: True if buffer is full, False otherwise.
+        :rtype: bool
+        """
+
+        return (self._size == self._capacity)
+
+    @property
+    def empty(self) -> bool:
+        """
+        Property that returns True if the buffer is empty, False otherwise.
+
+        Time complexity: O(1)
+
+        :returns: True if buffer is empty, False otherwise.
+        :rtype: bool
+        """
+
+        return (self._size == 0)
+
+    def reset(self):
+        """
+        Empties all elements from the buffer.
+
+
+        Time complexity: O(1)
+
+        :returns: True if buffer is empty, False otherwise.
+        :rtype: bool
+        """
+
+        self._begin = 0
+        self._end = 0
+        self._size = 0
+
+    def append(self, value) -> None:
+        """
+        Append a value to the buffer on the right. If the buffer is full, the
+        buffer will advance forward (wrapping around at the ends) and overwrite
+        an element.
+
+        Time complexity: O(1)
+        """
+        self[self._end] = value
+        self._end = (self._end + 1) % self._capacity
+
+        if self.full:
+            self._begin = (self._begin + 1) % self._capacity
+
+        else:
+            self._size += 1
+
+    def pop_left(self):
+        """
+        Gets the element at the start of the buffer and advances the start
+        of the buffer by one, consuming it.
+
+        Time complexity: O(1)
+
+        :returns: element at the start of the buffer
+        """
+
+        if not self.empty:
+            i = self._begin
+
+            self._begin = (self._begin + 1) % self._capacity
+            self._size -= 1
+
+            return (self[i])
+        else:
+            raise ValueError
