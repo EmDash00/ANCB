@@ -108,85 +108,159 @@ class CircularBuffer(ndarray):
     def __matmul__(self, x):
         x = asarray(x)
 
-        if x.ndim == 0:
-            raise ValueError(
+        if (x.ndim == 0):
+            ValueError(
                 "matmul: Input operand 1 does not have enough dimensions "
-                "(has 0, gufunc core with signature (n?,k),(k,m?)->(n?,m?)"
-                " requires 1)"
+                "(has 0, gufunc core with signature (n?,k),(k,m?)->(n?,m?) "
+                "requires 1"
             )
 
-        s = x.shape[-2] if x.ndim > 1 else x.shape[-1]
+        if x.ndim == 1 and self.ndim == 1:
+            # Dot product
+            if x.shape[0] == self._size:
+                if self.fragmented:
+                    k = self._capacity - self._begin  # fragmentation index
 
-        if (self.shape[-1] == s):
+                    out = matmul(self[self._begin:], x[:k])
+                    out += matmul(self[:self._end], x[k:])
+                else:
+                    if self._begin < self._end:
+                        part = self[self._begin:self._end]
+                    elif self._end == 0:
+                        part = self[self._begin:]
 
-            self_shape = (self._size, *self.shape[1:-2])
-            starexpr = tuple(zip_longest(self_shape, x.shape, fillvalue=1))
+                    matmul(part, x, out)
 
-            if star_can_broadcast(starexpr):
-                broadcast_shape = tuple(
-                    starmap(
-                        lambda a, b: max(a, b),
-                        starexpr
+                return(out)
+            else:
+                raise ValueError(
+                    "matmul: Input operand 1 has a mismatch in its core "
+                    "dimension 0, with gufunc signature (n?,k),(k,m?)->(n?,m?)"
+                    " (size {n} is different from {m})".format(
+                        n=self._size,
+                        m=x.shape[0]
                     )
                 )
-
-                out = empty((*broadcast_shape, self.shape[-1], x.shape[-2]))
+        elif self.ndim == 1 and x.ndim > 1:
+            if self._size == x.shape[-2]:
+                out = empty(*x.shape[:-2], x.shape[-1])
 
                 if self.fragmented:
+                    k = self._capacity - self._begin  # fragmentation index
 
-                    if self.ndim > 2:
-                        k = self._capacity - self._begin  # fragmentation index
-
-                        matmul(self[self._begin:], x[:k], out[:k])
-                        matmul(self[:self._end], x[k:], out[k:])
-
-                        # out[:k] = self[self._begin:] @ x[:k]
-                        # out[k:] = self[:self._end] @ x[k:]
-                    elif self.ndim == 2:
-                        k = self._capacity - self._begin  # fragmentation index
-
-                        matmul(self[self._begin:], x, out[..., :k, :])
-                        matmul(self[:self._end], x, out[..., k:, :])
-
-                        # out[..., :k, :] = self[self._begin:] @ x
-                        # out[..., k:, :] = self[:self._end] @ x
-                    else:
-                        # you really can't optimize further than this.
-                        matmul(self[self._begin:], x[..., :k, :], out)
-                        out += self[:self._end] @ x[..., k:, :]
-
+                    matmul(self[self._begin:], x[..., :k, :], out)
+                    out += matmul(self[:self._end], x[..., k:, :])
                 else:
-                    out = matmul(self[self._begin:self._end], x, out)
+                    if self._begin < self._end:
+                        part = self[self._begin:self._end]
+                    elif self._end == 0:
+                        part = self[self._begin:]
+
+                    matmul(part, x, out)
+
+                return(out)
+            else:
+                raise ValueError(
+                    "matmul: Input operand 1 has a mismatch in its core "
+                    "dimension 0, with gufunc signature (n?,k),(k,m?)->(n?,m?)"
+                    " (size {n} is different from {m})".format(
+                        n=self.shape[-2],
+                        m=x.shape[0]
+                    )
+                )
+        elif self.ndim == 2:
+            if (self.shape[-1] == x.shape[-2]):
+                out = empty(
+                    (*x.shape[:-2], self.shape[-1], x.shape[-2])
+                )
+
+                if self.fragmented:
+                    k = self._capacity - self._begin  # fragmentation index
+
+                    matmul(self[self._begin:], x[..., :k, :], out[..., :k, :])
+                    matmul(self[:self._end], x[..., k:, :], out[..., k:, :])
+                else:
+                    if self._begin < self._end:
+                        part = self[self._begin:self._end]
+                    elif self._end == 0:
+                        part = self[self._begin:]
+
+                    matmul(x, part, out)
 
                 return(out.view(ndarray))
+
             else:
-                print(
+                raise ValueError(
                     (
-                        "operands could not be broadcast together with"
-                        "remapped shapes [original->remapped]: "
-                        "{shape_b}->({shape_bn}newaxis,newaxis) "
-                        "{shape_a}->({shape_an}newaxis,newaxis) "
-                        "and requested shape ({n},{m})"
+                        "matmul: Input operand 1 has a mismatch in its core "
+                        "dimension 0, with gufunc signature (n?,k),(k,m?)->"
+                        "(n?,m?) (size {n} is different from {m})"
                     ).format(
-                        shape_a=self.shape,
-                        shape_b=x.shape,
-                        shape_an=self.shape[:-2],
-                        shape_bn=x.shape[:-2],
                         n=self.shape[-1],
                         m=x.shape[-2]
                     )
                 )
         else:
-            print(
-                (
-                    "matmul: Input operand 1 has a mismatch in its core "
-                    "dimension 0, with gufunc signature (n?,k),(k,m?)->(n?,m?)"
-                    " (size {n} is different from {m})"
-                ).format(
-                    n=self.shape[-1],
-                    m=x.shape[-2]
+            if (self.shape[-1] == x.shape[-2]):
+                self_shape = (self._size, *self.shape[1:-2])
+
+                starexpr = tuple(
+                    zip_longest(self_shape, x.shape[:-2], fillvalue=1)
                 )
-            )
+                if star_can_broadcast(starexpr):
+                    broadcast_shape = tuple(
+                        starmap(
+                            lambda a, b: max(a, b),
+                            starexpr
+                        )
+                    )
+
+                    out = empty(
+                        (*broadcast_shape, self.shape[-1], x.shape[-2])
+                    )
+
+                    if self.fragmented:
+                        k = self._capacity - self._begin  # fragmentation index
+
+                        matmul(x[:k], self[self._begin:], out[:k])
+                        matmul(x[k:], self[:self._end], out[k:])
+                    else:
+                        if self._begin < self._end:
+                            part = self[self._begin:self._end]
+                        elif self._end == 0:
+                            part = self[self._begin:]
+
+                        matmul(part, x, out)
+
+                    return(out.view(ndarray))
+                else:
+                    print(
+                        (
+                            "operands could not be broadcast together with"
+                            "remapped shapes [original->remapped]: "
+                            "{shape_b}->({shape_bn}, newaxis,newaxis) "
+                            "{shape_a}->({shape_an}, newaxis,newaxis) "
+                            "and requested shape ({n},{m})"
+                        ).format(
+                            shape_a=self_shape,
+                            shape_b=x.shape,
+                            shape_an=self.shape[:-2].__str__()[:-1],
+                            shape_bn=x.shape[:-2].__str__()[:-1],
+                            n=self.shape[-1],
+                            m=x.shape[-2]
+                        )
+                    )
+            else:
+                raise ValueError(
+                    (
+                        "matmul: Input operand 1 has a mismatch in its core "
+                        "dimension 0, with gufunc signature (n?,k),(k,m?)->"
+                        "(n?,m?) (size {n} is different from {m})"
+                    ).format(
+                        n=self.shape[-1],
+                        m=x.shape[-2]
+                    )
+                )
 
     def __rmatmul__(self, x):
         x = asarray(x)
@@ -232,7 +306,7 @@ class CircularBuffer(ndarray):
                     if self.fragmented:
                         k = self._capacity - self._begin  # fragmentation index
 
-                        matmul(x[:k], self[self._begin:], out)
+                        matmul(self[self._begin:], x[:k], out)
                         out += matmul(x[k:], self[:self._end])
                     else:
                         if self._begin < self._end:
@@ -277,8 +351,8 @@ class CircularBuffer(ndarray):
                 if self.fragmented:
                     k = self._capacity - self._begin  # fragmentation index
 
-                    matmul(x[..., :, :k], self[self._begin:], out)
-                    out += matmul(x[..., :, k:], self[:self._end])
+                    matmul(x[..., :k, :], self[self._begin:], out)
+                    out += matmul(x[..., k:, :], self[:self._end])
                 else:
                     if self._begin < self._end:
                         part = self[self._begin:self._end]
