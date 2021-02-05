@@ -140,13 +140,32 @@ class TestCircularBuffer(unittest.TestCase):
 
         buffer.pop_left()
 
+    def test_matmul1(self):
+        data = zeros(3)
+        A = zeros((3, 3))
+        B = arange(9).reshape(3, 3)
+        C = arange(3)
+        fill_diagonal(A, [1, 2, 3])
+
+        buffer = CircularBuffer(data)
+        buffer.append(0)
+        buffer.append(1)
+        buffer.append(2)
+
+        self.assertTrue(array_equal(buffer @ A, array([0, 1, 2]) @ A))
+
+        buffer.append(3)
+        self.assertTrue(array_equal(A @ buffer, A @ array([1, 2, 3])))
+        self.assertTrue(array_equal(B @ buffer, B @ array([1, 2, 3])))
+        self.assertTrue(array_equal(C @ buffer, C @ array([1, 2, 3])))
+
+
     def test_rmatmul1(self):
         data = zeros(3)
         A = zeros(9).reshape(3, 3)
         B = arange(9).reshape(3, 3)
         C = arange(3)
         fill_diagonal(A, [1, 2, 3])
-
 
         buffer = CircularBuffer(data)
         buffer.append(0)
