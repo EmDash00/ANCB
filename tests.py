@@ -2,7 +2,7 @@ import unittest
 from circularbuffer import CircularBuffer, can_broadcast  # type: ignore
 from circularbuffer import star_can_broadcast
 from numpy import array_equal, array, zeros, arange  # type: ignore
-from numpy import eye, matmul, fill_diagonal
+from numpy import fill_diagonal
 from itertools import zip_longest
 
 
@@ -155,10 +155,34 @@ class TestCircularBuffer(unittest.TestCase):
         self.assertTrue(array_equal(buffer @ A, array([0, 1, 2]) @ A))
 
         buffer.append(3)
-        self.assertTrue(array_equal(A @ buffer, A @ array([1, 2, 3])))
-        self.assertTrue(array_equal(B @ buffer, B @ array([1, 2, 3])))
-        self.assertTrue(array_equal(C @ buffer, C @ array([1, 2, 3])))
+        self.assertTrue(array_equal(buffer @ A, array([1, 2, 3]) @ A))
+        self.assertTrue(array_equal(buffer @ B, array([1, 2, 3]) @ B))
+        self.assertTrue(array_equal(buffer @ C, array([1, 2, 3]) @ C))
 
+    def test_matmul2(self):
+        data = zeros((3, 3))
+        A = zeros(9).reshape(3, 3)
+        B = arange(9).reshape(3, 3)
+
+        fill_diagonal(A, [1, 2, 3])
+        buffer = CircularBuffer(data)
+
+        buffer.append([0, 1, 2])
+        buffer.append([3, 4, 5])
+        buffer.append([6, 7, 8])
+
+        test = arange(9).reshape(3, 3)
+
+        self.assertTrue(array_equal(buffer, test))
+
+        self.assertTrue(array_equal(buffer @ A, test @ A))
+        self.assertTrue(array_equal(buffer @ B, test @ B))
+
+        buffer.append([9, 10, 11])
+        test += 3
+
+        self.assertTrue(array_equal(buffer @ A, test @ A))
+        self.assertTrue(array_equal(buffer @ B, test @ B))
 
     def test_rmatmul1(self):
         data = zeros(3)
@@ -178,6 +202,30 @@ class TestCircularBuffer(unittest.TestCase):
         self.assertTrue(array_equal(A @ buffer, A @ array([1, 2, 3])))
         self.assertTrue(array_equal(B @ buffer, B @ array([1, 2, 3])))
         self.assertTrue(array_equal(C @ buffer, C @ array([1, 2, 3])))
+
+    def test_matmuln(self):
+        data = zeros((3, 3, 3))
+        A = zeros(27).reshape(3, 3, 3)
+        B = arange(27).reshape(3, 3, 3)
+
+        fill_diagonal(A, [1, 2, 3])
+        buffer = CircularBuffer(data)
+        filler = arange(9).reshape(3, 3)
+
+        buffer.append(filler)
+        buffer.append(filler + 9)
+        buffer.append(filler + 18)
+
+        test = arange(27).reshape(3, 3, 3)
+
+        self.assertTrue(array_equal(buffer @ A, test @ A))
+        self.assertTrue(array_equal(buffer @ B, test @ B))
+
+        buffer.append(filler + 27)
+        test += 9
+
+        self.assertTrue(array_equal(buffer @ A, test @ A))
+        self.assertTrue(array_equal(buffer @ B, test @ B))
 
     def test_rmatmul2(self):
         data = zeros((3, 3))
