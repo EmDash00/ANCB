@@ -258,6 +258,7 @@ class TestCircularBuffer(unittest.TestCase):
         data = zeros((3, 3, 3))
         A = zeros(27).reshape(3, 3, 3)
         B = arange(27).reshape(3, 3, 3)
+        C = arange(12).reshape(4, 3)
 
         fill_diagonal(A, [1, 2, 3])
         buffer = CircularBuffer(data)
@@ -271,12 +272,14 @@ class TestCircularBuffer(unittest.TestCase):
 
         self.assertTrue(array_equal(A @ buffer, A @ test))
         self.assertTrue(array_equal(B @ buffer, B @ test))
+        self.assertTrue(array_equal(C @ buffer, C @ test))
 
         buffer.append(filler + 27)
         test += 9
 
         self.assertTrue(array_equal(A @ buffer, A @ test))
         self.assertTrue(array_equal(B @ buffer, B @ test))
+        self.assertTrue(array_equal(C @ buffer, C @ test))
 
     def test_forward(self):
         data = zeros(3)

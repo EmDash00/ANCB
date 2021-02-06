@@ -424,14 +424,18 @@ class CircularBuffer(ndarray):
                     )
 
                     out = empty(
-                        (*broadcast_shape, x.shape[-1], self.shape[-2])
+                        (*broadcast_shape, x.shape[-2], self.shape[-1])
                     )
 
                     if self.fragmented:
                         k = self._capacity - self._begin  # fragmentation index
 
-                        matmul(x[:k], self[self._begin:], out[:k])
-                        matmul(x[k:], self[:self._end], out[k:])
+                        if x.ndim > 2:
+                            matmul(x[:k], self[self._begin:], out[:k])
+                            matmul(x[k:], self[:self._end], out[k:])
+                        else:
+                            matmul(x, self[self._begin:], out[:k])
+                            matmul(x, self[:self._end], out[k:])
                     else:
                         if self._begin < self._end:
                             part = self[self._begin:self._end]
