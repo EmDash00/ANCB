@@ -205,8 +205,9 @@ class TestCircularBuffer(unittest.TestCase):
 
     def test_matmuln(self):
         data = zeros((3, 3, 3))
-        A = zeros(27).reshape(3, 3, 3)
+        A = zeros((3, 3, 3))
         B = arange(27).reshape(3, 3, 3)
+        C = arange(12).reshape(3, 4)
 
         fill_diagonal(A, [1, 2, 3])
         buffer = CircularBuffer(data)
@@ -226,6 +227,7 @@ class TestCircularBuffer(unittest.TestCase):
 
         self.assertTrue(array_equal(buffer @ A, test @ A))
         self.assertTrue(array_equal(buffer @ B, test @ B))
+        self.assertTrue(array_equal(buffer @ C, test @ C))
 
     def test_rmatmul2(self):
         data = zeros((3, 3))
