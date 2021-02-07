@@ -110,18 +110,6 @@ class TestCircularBuffer(unittest.TestCase):
         buffer.pop_left()
         self.assertFalse(buffer.fragmented)
 
-        """
-        buffer.append_left(0)
-        self.assertFalse(buffer.fragmented)
-        buffer.append_left(1)
-        self.assertFalse(buffer.fragmented)
-        buffer.append_left(2)
-        self.assertFalse(buffer.fragmented)
-
-        buffer.pop()
-        self.assertFalse(buffer.fragmented)
-        """
-
     def test_add(self):
         data = zeros(3)
         x = arange(3)
@@ -357,86 +345,6 @@ class TestCircularBuffer(unittest.TestCase):
         self.assertTrue(array_equal(buffer.pop_left(), data[2]))
 
         self.assertTrue(buffer.empty)
-
-
-"""
-    def test_backward_nd(self):
-        data = zeros(3)
-
-        buffer = CircularBuffer(data)
-
-        buffer.append_left(1)
-        self.assertTrue(array_equal(buffer, array([0, 0, 1])))
-
-        buffer.append_left(2)
-        self.assertTrue(array_equal(buffer, array([0, 2, 1])))
-
-        buffer.append_left(3)
-        self.assertTrue(array_equal(buffer, array([3, 2, 1])))
-
-        self.assertTrue(buffer.full)
-
-        self.assertEqual(buffer.pop(), data[2])
-        self.assertEqual(buffer.pop(), data[1])
-        self.assertEqual(buffer.pop(), data[0])
-
-        self.assertTrue(buffer.empty)
-
-    def test_backward3(self):
-        data = zeros((3, 3, 3))
-
-        buffer = CircularBuffer(data)
-
-        buffer.append_left(1)
-        self.assertTrue(
-            array_equal(
-                buffer,
-                array(
-                    [
-                        [[0, 0, 0], [0, 0, 0], [0, 0, 0]],
-                        [[0, 0, 0], [0, 0, 0], [0, 0, 0]],
-                        [[1, 1, 1], [1, 1, 1], [1, 1, 1]]
-                    ]
-                )
-            )
-        )
-
-        buffer.append_left(2)
-        self.assertTrue(
-            array_equal(
-                buffer,
-                array(
-                    [
-                        [[0, 0, 0], [0, 0, 0], [0, 0, 0]],
-                        [[2, 2, 2], [2, 2, 2], [2, 2, 2]],
-                        [[1, 1, 1], [1, 1, 1], [1, 1, 1]]
-                    ]
-                )
-            )
-        )
-
-        buffer.append_left(3)
-        self.assertTrue(
-            array_equal(
-                buffer,
-                array(
-                    [
-                        [[3, 3, 3], [3, 3, 3], [3, 3, 3]],
-                        [[2, 2, 2], [2, 2, 2], [2, 2, 2]],
-                        [[1, 1, 1], [1, 1, 1], [1, 1, 1]]
-                    ]
-                )
-            )
-        )
-
-        self.assertTrue(buffer.full)
-
-        self.assertTrue(array_equal(buffer.pop(), data[2]))
-        self.assertTrue(array_equal(buffer.pop(), data[1]))
-        self.assertTrue(array_equal(buffer.pop(), data[0]))
-
-        self.assertTrue(buffer.empty)
-"""
 
 
 def main():
