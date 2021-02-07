@@ -59,7 +59,7 @@ def star_can_broadcast(starexpr) -> bool:
     )
 
 
-class CircularBuffer(ndarray):
+class NumpyCircularQueue(ndarray):
     """
     Implements a circular (ring) buffer using a numpy array. This
     implmentation uses an internal size count and capacity count so that

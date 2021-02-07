@@ -1,6 +1,8 @@
 import unittest
-from circularbuffer import CircularBuffer, can_broadcast  # type: ignore
-from circularbuffer import star_can_broadcast
+from numpy_circularqueue import NumpyCircularQueue
+from numpy_circularqueue import (  # type: ignore
+    star_can_broadcast, can_broadcast
+)
 from numpy import array_equal, array, zeros, arange  # type: ignore
 from numpy import fill_diagonal
 from itertools import zip_longest
@@ -67,20 +69,20 @@ class TestBroadcastability(unittest.TestCase):
         self.assertTrue(star_can_broadcast(starexpr))
 
 
-class TestCircularBuffer(unittest.TestCase):
+class TestNumpyCircularQueue(unittest.TestCase):
     """
-    CircularBuffer tests
+    NumpyCircularQueue tests
     """
 
     def test_init(self):
         data = zeros(3)
-        buffer = CircularBuffer(data)
+        buffer = NumpyCircularQueue(data)
         self.assertTrue(array_equal(data, buffer))
 
     def test_fragmentation(self):
         data = zeros(3)
 
-        buffer = CircularBuffer(data)
+        buffer = NumpyCircularQueue(data)
         self.assertFalse(buffer.fragmented)
 
         buffer.append(0)
@@ -114,7 +116,7 @@ class TestCircularBuffer(unittest.TestCase):
         data = zeros(3)
         x = arange(3)
 
-        buffer = CircularBuffer(data)
+        buffer = NumpyCircularQueue(data)
         buffer.append(0)
         buffer.append(1)
         buffer.append(2)
@@ -135,7 +137,7 @@ class TestCircularBuffer(unittest.TestCase):
         C = arange(3)
         fill_diagonal(A, [1, 2, 3])
 
-        buffer = CircularBuffer(data)
+        buffer = NumpyCircularQueue(data)
         buffer.append(0)
         buffer.append(1)
         buffer.append(2)
@@ -153,7 +155,7 @@ class TestCircularBuffer(unittest.TestCase):
         B = arange(9).reshape(3, 3)
 
         fill_diagonal(A, [1, 2, 3])
-        buffer = CircularBuffer(data)
+        buffer = NumpyCircularQueue(data)
 
         buffer.append([0, 1, 2])
         buffer.append([3, 4, 5])
@@ -179,7 +181,7 @@ class TestCircularBuffer(unittest.TestCase):
         C = arange(3)
         fill_diagonal(A, [1, 2, 3])
 
-        buffer = CircularBuffer(data)
+        buffer = NumpyCircularQueue(data)
         buffer.append(0)
         buffer.append(1)
         buffer.append(2)
@@ -198,7 +200,7 @@ class TestCircularBuffer(unittest.TestCase):
         C = arange(12).reshape(3, 4)
 
         fill_diagonal(A, [1, 2, 3])
-        buffer = CircularBuffer(data)
+        buffer = NumpyCircularQueue(data)
         filler = arange(9).reshape(3, 3)
 
         buffer.append(filler)
@@ -223,7 +225,7 @@ class TestCircularBuffer(unittest.TestCase):
         B = arange(9).reshape(3, 3)
 
         fill_diagonal(A, [1, 2, 3])
-        buffer = CircularBuffer(data)
+        buffer = NumpyCircularQueue(data)
 
         buffer.append([0, 1, 2])
         buffer.append([3, 4, 5])
@@ -249,7 +251,7 @@ class TestCircularBuffer(unittest.TestCase):
         C = arange(12).reshape(4, 3)
 
         fill_diagonal(A, [1, 2, 3])
-        buffer = CircularBuffer(data)
+        buffer = NumpyCircularQueue(data)
         filler = arange(9).reshape(3, 3)
 
         buffer.append(filler)
@@ -272,7 +274,7 @@ class TestCircularBuffer(unittest.TestCase):
     def test_forward(self):
         data = zeros(3)
 
-        buffer = CircularBuffer(data)
+        buffer = NumpyCircularQueue(data)
 
         buffer.append(1)
         self.assertTrue(array_equal(buffer, array([1, 0, 0])))
@@ -294,7 +296,7 @@ class TestCircularBuffer(unittest.TestCase):
     def test_forward_nd(self):
         data = zeros((3, 3, 3))
 
-        buffer = CircularBuffer(data)
+        buffer = NumpyCircularQueue(data)
 
         buffer.append(1)
         self.assertTrue(
