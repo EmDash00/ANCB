@@ -249,6 +249,38 @@ class TestNumpyCircularBuffer(unittest.TestCase):
         self.assertTrue(array_equal(buffer @ B, test @ B))
         self.assertTrue(array_equal(buffer @ C, test @ C))
 
+    def test_rmatmul_1d1d(self):
+        data = zeros(3)
+        C = arange(3)
+
+        buffer = NumpyCircularBuffer(data)
+        buffer.append(0)
+        self.assertTrue(array_equal(C[:1] @ buffer, C[:1] @ arange(1)))
+
+        buffer.append(1)
+        self.assertTrue(array_equal(C[:2] @ buffer, C[:2] @ arange(2)))
+
+        buffer.append(2)
+        self.assertTrue(array_equal(C @ buffer, C @ arange(3)))
+
+        buffer.append(3)
+        self.assertTrue(array_equal(C @ buffer, C @ arange(1, 4)))
+
+        buffer.append(4)
+        self.assertTrue(array_equal(C @ buffer, C @ arange(2, 5)))
+
+        buffer.append(5)
+        self.assertTrue(array_equal(C @ buffer, C @ arange(3, 6)))
+
+        buffer.append(6)
+        self.assertTrue(array_equal(C @ buffer, C @ arange(4, 7)))
+
+        buffer.pop_left()
+        self.assertTrue(array_equal(C[1:] @ buffer, C[1:] @ arange(5, 7)))
+
+        buffer.pop_left()
+        self.assertTrue(array_equal(C[2:] @ buffer, C[2:] @ arange(6, 7)))
+
     def test_rmatmul2(self):
         data = zeros((3, 3))
         A = zeros(9).reshape(3, 3)

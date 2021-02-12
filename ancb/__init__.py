@@ -290,7 +290,7 @@ class NumpyCircularBuffer(ndarray):
                     elif self._end == 0:
                         part = self[self._begin:]
 
-                    matmul(x, part, out)
+                    out = matmul(x, part)
 
                 return(out)
             else:
