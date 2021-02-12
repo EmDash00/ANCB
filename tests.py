@@ -131,6 +131,8 @@ class TestNumpyCircularBuffer(unittest.TestCase):
         buffer.pop_left()
 
     def test_matmul_1d1d(self):
+        """Tests buffer @ X where buffer.ndim == 1 and X.ndim == 1"""
+
         data = zeros(3)
         C = arange(3)
 
@@ -163,6 +165,8 @@ class TestNumpyCircularBuffer(unittest.TestCase):
         self.assertTrue(array_equal(buffer @ C[2:], (arange(6, 7)) @ C[2:]))
 
     def test_matmul_1d2d(self):
+        """Tests buffer @ X where buffer.ndim == 1 and X.ndim == 2"""
+
         data = zeros(3)
         A = zeros((3, 3))
         B = arange(9).reshape(3, 3)
@@ -180,6 +184,8 @@ class TestNumpyCircularBuffer(unittest.TestCase):
         self.assertTrue(array_equal(buffer @ B, array([1, 2, 3]) @ B))
 
     def test_matmul2(self):
+        """Tests buffer @ X where buffer.ndim == 2"""
+
         data = zeros((3, 3))
         A = zeros(9).reshape(3, 3)
         B = arange(9).reshape(3, 3)
@@ -204,26 +210,8 @@ class TestNumpyCircularBuffer(unittest.TestCase):
         self.assertTrue(array_equal(buffer @ A, test @ A))
         self.assertTrue(array_equal(buffer @ B, test @ B))
 
-    def test_rmatmul1(self):
-        data = zeros(3)
-        A = zeros(9).reshape(3, 3)
-        B = arange(9).reshape(3, 3)
-        C = arange(3)
-        fill_diagonal(A, [1, 2, 3])
-
-        buffer = NumpyCircularBuffer(data)
-        buffer.append(0)
-        buffer.append(1)
-        buffer.append(2)
-
-        self.assertTrue(array_equal(A @ buffer, A @ array([0, 1, 2])))
-
-        buffer.append(3)
-        self.assertTrue(array_equal(A @ buffer, A @ array([1, 2, 3])))
-        self.assertTrue(array_equal(B @ buffer, B @ array([1, 2, 3])))
-        self.assertTrue(array_equal(C @ buffer, C @ array([1, 2, 3])))
-
     def test_matmuln(self):
+        """Tests buffer @ X where X.ndim > 2 and buffer.ndim > 2"""
         data = zeros((3, 3, 3))
         A = zeros((3, 3, 3))
         B = arange(27).reshape(3, 3, 3)
@@ -249,7 +237,28 @@ class TestNumpyCircularBuffer(unittest.TestCase):
         self.assertTrue(array_equal(buffer @ B, test @ B))
         self.assertTrue(array_equal(buffer @ C, test @ C))
 
+    def test_rmatmul1(self):
+        data = zeros(3)
+        A = zeros(9).reshape(3, 3)
+        B = arange(9).reshape(3, 3)
+        C = arange(3)
+        fill_diagonal(A, [1, 2, 3])
+
+        buffer = NumpyCircularBuffer(data)
+        buffer.append(0)
+        buffer.append(1)
+        buffer.append(2)
+
+        self.assertTrue(array_equal(A @ buffer, A @ array([0, 1, 2])))
+
+        buffer.append(3)
+        self.assertTrue(array_equal(A @ buffer, A @ array([1, 2, 3])))
+        self.assertTrue(array_equal(B @ buffer, B @ array([1, 2, 3])))
+        self.assertTrue(array_equal(C @ buffer, C @ array([1, 2, 3])))
+
     def test_rmatmul_1d1d(self):
+        """Tests X @ buffer where X.ndim == 1 and buffer.ndim == 1"""
+
         data = zeros(3)
         C = arange(3)
 
@@ -280,6 +289,38 @@ class TestNumpyCircularBuffer(unittest.TestCase):
 
         buffer.pop_left()
         self.assertTrue(array_equal(C[2:] @ buffer, C[2:] @ arange(6, 7)))
+
+    def test_rmatmulnd1d(self):
+        """Tests X @ buffer where X.ndim == 1 and buffer.ndim > 1"""
+
+        data = zeros(3)
+        A = zeros(9).reshape(3, 3)
+        B = arange(9).reshape(3, 3)
+        C = arange(3)
+        fill_diagonal(A, [1, 2, 3])
+
+        buffer = NumpyCircularBuffer(data)
+        buffer.append(0)
+        buffer.append(1)
+        buffer.append(2)
+
+        self.assertTrue(array_equal(A @ buffer, A @ array([0, 1, 2])))
+
+        buffer.append(3)
+        self.assertTrue(array_equal(A @ buffer, A @ array([1, 2, 3])))
+        self.assertTrue(array_equal(B @ buffer, B @ array([1, 2, 3])))
+        self.assertTrue(array_equal(C @ buffer, C @ array([1, 2, 3])))
+
+        buffer.append(4)
+        self.assertTrue(array_equal(A @ buffer, A @ arange(2, 5)))
+        self.assertTrue(array_equal(B @ buffer, B @ arange(2, 5)))
+        self.assertTrue(array_equal(C @ buffer, C @ arange(2, 5)))
+
+        buffer.append(5)
+        self.assertTrue(array_equal(A @ buffer, A @ arange(3, 6)))
+        self.assertTrue(array_equal(B @ buffer, B @ arange(3, 6)))
+        self.assertTrue(array_equal(C @ buffer, C @ arange(3, 6)))
+
 
     def test_rmatmul2(self):
         data = zeros((3, 3))
