@@ -771,7 +771,7 @@ class NumpyCircularBuffer(ndarray):
                 elif self._end == 0:
                     part = self[self._begin:]
 
-                multiply(x, part, out)
+                divide(x, part, out)
 
             return(out.view(ndarray))
         else:
@@ -856,7 +856,7 @@ class NumpyCircularBuffer(ndarray):
                 )
             )
 
-    def __divmod__(self, x):
+    def __mod__(self, x):
         x = asarray(x)
 
         self_shape = (self._size, *self.shape[1:])
@@ -892,7 +892,7 @@ class NumpyCircularBuffer(ndarray):
                 )
             )
 
-    def __rdivmod__(self, x):
+    def __rmod__(self, x):
         x = asarray(x)
 
         self_shape = (self._size, *self.shape[1:])
@@ -965,7 +965,7 @@ class NumpyCircularBuffer(ndarray):
                 )
             )
 
-    def __rpower__(self, x):
+    def __rpow__(self, x):
         x = asarray(x)
 
         self_shape = (self._size, *self.shape[1:])
@@ -1037,6 +1037,43 @@ class NumpyCircularBuffer(ndarray):
                 )
             )
 
+    def __rand__(self, x):
+        x = asarray(x)
+
+        self_shape = (self._size, *self.shape[1:])
+        starexpr = tuple(zip_longest(self_shape, x.shape, fillvalue=1))
+
+        if star_can_broadcast(starexpr):
+            out = empty(tuple(starmap(lambda a, b: max(a, b), starexpr)))
+
+            if self.fragmented:
+                k = self._capacity - self._begin  # fragmentation index
+
+                if x.ndim >= 1:
+                    bitwise_and(self[self._begin:], x[:k], out[:k])
+                    bitwise_and(self[:self._end], x[k:], out[k:])
+                else:
+                    bitwise_and(self[self._begin:], x, out[:k])
+                    bitwise_and(self[:self._end], x, out[k:])
+
+            else:
+                if self._begin < self._end:
+                    part = self[self._begin:self._end]
+                elif self._end == 0:
+                    part = self[self._begin:]
+
+                bitwise_and(x, part, out)
+
+            return(out.view(ndarray))
+        else:
+            raise ValueError(
+                "operands could not be broadcast"
+                "together with shapes {} {}".format(
+                    x.shape,
+                    (self._size, *self.shape[1:])
+                )
+            )
+
     def __or__(self, x):
         x = asarray(x)
 
@@ -1055,6 +1092,43 @@ class NumpyCircularBuffer(ndarray):
                 else:
                     bitwise_or(x, self[self._begin:], out[:k])
                     bitwise_or(x, self[:self._end], out[k:])
+
+            else:
+                if self._begin < self._end:
+                    part = self[self._begin:self._end]
+                elif self._end == 0:
+                    part = self[self._begin:]
+
+                bitwise_or(x, part, out)
+
+            return(out.view(ndarray))
+        else:
+            raise ValueError(
+                "operands could not be broadcast"
+                "together with shapes {} {}".format(
+                    x.shape,
+                    (self._size, *self.shape[1:])
+                )
+            )
+
+    def __ror__(self, x):
+        x = asarray(x)
+
+        self_shape = (self._size, *self.shape[1:])
+        starexpr = tuple(zip_longest(self_shape, x.shape, fillvalue=1))
+
+        if star_can_broadcast(starexpr):
+            out = empty(tuple(starmap(lambda a, b: max(a, b), starexpr)))
+
+            if self.fragmented:
+                k = self._capacity - self._begin  # fragmentation index
+
+                if x.ndim >= 1:
+                    bitwise_or(self[self._begin:], x[:k], out[:k])
+                    bitwise_or(self[:self._end], x[k:], out[k:])
+                else:
+                    bitwise_or(self[self._begin:], x, out[:k])
+                    bitwise_or(self[:self._end], x, out[k:])
 
             else:
                 if self._begin < self._end:
@@ -1111,6 +1185,43 @@ class NumpyCircularBuffer(ndarray):
                 )
             )
 
+    def __rxor__(self, x):
+        x = asarray(x)
+
+        self_shape = (self._size, *self.shape[1:])
+        starexpr = tuple(zip_longest(self_shape, x.shape, fillvalue=1))
+
+        if star_can_broadcast(starexpr):
+            out = empty(tuple(starmap(lambda a, b: max(a, b), starexpr)))
+
+            if self.fragmented:
+                k = self._capacity - self._begin  # fragmentation index
+
+                if x.ndim >= 1:
+                    bitwise_xor(self[self._begin:], x[:k], out[:k])
+                    bitwise_xor(self[:self._end], x[k:], out[k:])
+                else:
+                    bitwise_xor(self[self._begin:], x, out[:k])
+                    bitwise_xor(self[:self._end], x, out[k:])
+
+            else:
+                if self._begin < self._end:
+                    part = self[self._begin:self._end]
+                elif self._end == 0:
+                    part = self[self._begin:]
+
+                bitwise_xor(x, part, out)
+
+            return(out.view(ndarray))
+        else:
+            raise ValueError(
+                "operands could not be broadcast"
+                "together with shapes {} {}".format(
+                    x.shape,
+                    (self._size, *self.shape[1:])
+                )
+            )
+
     def __rshift__(self, x):
         x = asarray(x)
 
@@ -1147,6 +1258,42 @@ class NumpyCircularBuffer(ndarray):
                 )
             )
 
+    def __rrshift__(self, x):
+        x = asarray(x)
+
+        self_shape = (self._size, *self.shape[1:])
+        starexpr = tuple(zip_longest(self_shape, x.shape, fillvalue=1))
+
+        if star_can_broadcast(starexpr):
+            out = empty(tuple(starmap(lambda a, b: max(a, b), starexpr)))
+
+            if self.fragmented:
+                k = self._capacity - self._begin  # fragmentation index
+                if x.ndim >= 1:
+                    right_shift(x[:k], self[self._begin:], out[:k])
+                    right_shift(x[k:], self[:self._end], out[k:])
+                else:
+                    right_shift(x, self[self._begin:], out[:k])
+                    right_shift(x, self[:self._end], out[k:])
+
+            else:
+                if self._begin < self._end:
+                    part = self[self._begin:self._end]
+                elif self._end == 0:
+                    part = self[self._begin:]
+
+                right_shift(x, part, out)
+
+            return(out.view(ndarray))
+        else:
+            raise ValueError(
+                "operands could not be broadcast "
+                "together with shapes {} {}".format(
+                    (self._size, *self.shape[1:]),
+                    x.shape
+                )
+            )
+
     def __lshift__(self, x):
         x = asarray(x)
 
@@ -1171,7 +1318,7 @@ class NumpyCircularBuffer(ndarray):
                 elif self._end == 0:
                     part = self[self._begin:]
 
-                right_shift(part, x, out)
+                left_shift(part, x, out)
 
             return(out.view(ndarray))
         else:
@@ -1183,7 +1330,43 @@ class NumpyCircularBuffer(ndarray):
                 )
             )
 
-    def __inv__(self):
+    def __rlshift__(self, x):
+        x = asarray(x)
+
+        self_shape = (self._size, *self.shape[1:])
+        starexpr = tuple(zip_longest(self_shape, x.shape, fillvalue=1))
+
+        if star_can_broadcast(starexpr):
+            out = empty(tuple(starmap(lambda a, b: max(a, b), starexpr)))
+
+            if self.fragmented:
+                k = self._capacity - self._begin  # fragmentation index
+                if x.ndim >= 1:
+                    left_shift(x[:k], self[self._begin:], out[:k])
+                    left_shift(x[k:], self[:self._end], out[k:])
+                else:
+                    left_shift(x, self[self._begin:], out[:k])
+                    left_shift(x, self[:self._end], out[k:])
+
+            else:
+                if self._begin < self._end:
+                    part = self[self._begin:self._end]
+                elif self._end == 0:
+                    part = self[self._begin:]
+
+                left_shift(x, part, out)
+
+            return(out.view(ndarray))
+        else:
+            raise ValueError(
+                "operands could not be broadcast "
+                "together with shapes {} {}".format(
+                    (self._size, *self.shape[1:]),
+                    x.shape
+                )
+            )
+
+    def __invert__(self):
         out = empty((self._size, *self.shape[1:]))
 
         if self.fragmented:
@@ -1201,6 +1384,9 @@ class NumpyCircularBuffer(ndarray):
             invert(part, out)
 
         return(out.view(ndarray))
+
+    def __inv__(self):
+        return self.__invert__()
 
     def __abs__(self):
         out = empty((self._size, *self.shape[1:]))
