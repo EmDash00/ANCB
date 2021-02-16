@@ -1,10 +1,15 @@
 import unittest
+
 from ancb import NumpyCircularBuffer
 from ancb import (  # type: ignore
     star_can_broadcast, can_broadcast
 )
-from numpy import array_equal, array, zeros, arange  # type: ignore
+
+from numpy import array_equal, allclose
+from numpy import array, zeros, arange
+from numpy.random import rand
 from numpy import fill_diagonal
+
 from itertools import zip_longest
 
 
@@ -134,42 +139,42 @@ class TestNumpyCircularBuffer(unittest.TestCase):
         """Tests buffer @ X where buffer.ndim == 1 and X.ndim == 1"""
 
         data = zeros(3)
-        C = arange(3)
+        C = rand(3)
 
         buffer = NumpyCircularBuffer(data)
         buffer.append(0)
-        self.assertTrue(array_equal(buffer @ C[:1], arange(1) @ C[:1]))
+        self.assertTrue(allclose(buffer @ C[:1], arange(1) @ C[:1]))
 
         buffer.append(1)
-        self.assertTrue(array_equal(buffer @ C[:2], arange(2) @ C[:2]))
+        self.assertTrue(allclose(buffer @ C[:2], arange(2) @ C[:2]))
 
         buffer.append(2)
-        self.assertTrue(array_equal(buffer @ C, arange(3) @ C))
+        self.assertTrue(allclose(buffer @ C, arange(3) @ C))
 
         buffer.append(3)
-        self.assertTrue(array_equal(buffer @ C, (arange(1, 4)) @ C))
+        self.assertTrue(allclose(buffer @ C, (arange(1, 4)) @ C))
 
         buffer.append(4)
-        self.assertTrue(array_equal(buffer @ C, (arange(2, 5)) @ C))
+        self.assertTrue(allclose(buffer @ C, (arange(2, 5)) @ C))
 
         buffer.append(5)
-        self.assertTrue(array_equal(buffer @ C, (arange(3, 6)) @ C))
+        self.assertTrue(allclose(buffer @ C, (arange(3, 6)) @ C))
 
         buffer.append(6)
-        self.assertTrue(array_equal(buffer @ C, (arange(4, 7)) @ C))
+        self.assertTrue(allclose(buffer @ C, (arange(4, 7)) @ C))
 
         buffer.pop_left()
-        self.assertTrue(array_equal(buffer @ C[1:], (arange(5, 7)) @ C[1:]))
+        self.assertTrue(allclose(buffer @ C[1:], (arange(5, 7)) @ C[1:]))
 
         buffer.pop_left()
-        self.assertTrue(array_equal(buffer @ C[2:], (arange(6, 7)) @ C[2:]))
+        self.assertTrue(allclose(buffer @ C[2:], (arange(6, 7)) @ C[2:]))
 
     def test_matmul_1d2d(self):
         """Tests buffer @ X where buffer.ndim == 1 and X.ndim == 2"""
 
         data = zeros(3)
         A = zeros((3, 3))
-        B = arange(9).reshape(3, 3)
+        B = rand(9).reshape(3, 3)
         fill_diagonal(A, [1, 2, 3])
 
         buffer = NumpyCircularBuffer(data)
@@ -177,45 +182,46 @@ class TestNumpyCircularBuffer(unittest.TestCase):
         buffer.append(1)
         buffer.append(2)
 
-        self.assertTrue(array_equal(buffer @ A, array([0, 1, 2]) @ A))
+        self.assertTrue(array_equal(buffer @ A, arange(3) @ A))
+        self.assertTrue(allclose(buffer @ B, arange(3) @ B))
 
         buffer.append(3)
-        self.assertTrue(array_equal(buffer @ A, array([1, 2, 3]) @ A))
-        self.assertTrue(array_equal(buffer @ B, array([1, 2, 3]) @ B))
+        self.assertTrue(allclose(buffer @ A, arange(1, 4) @ A))
+        self.assertTrue(allclose(buffer @ B, arange(1, 4) @ B))
 
     def test_matmul2(self):
         """Tests buffer @ X where buffer.ndim == 2"""
 
         data = zeros((3, 3))
         A = zeros(9).reshape(3, 3)
-        B = arange(9).reshape(3, 3)
+        B = rand(9).reshape(3, 3)
 
-        fill_diagonal(A, [1, 2, 3])
+        fill_diagonal(A, arange(1, 4))
         buffer = NumpyCircularBuffer(data)
 
-        buffer.append([0, 1, 2])
-        buffer.append([3, 4, 5])
-        buffer.append([6, 7, 8])
+        buffer.append(arange(3))
+        buffer.append(arange(3, 6))
+        buffer.append(arange(6, 9))
 
         test = arange(9).reshape(3, 3)
 
         self.assertTrue(array_equal(buffer, test))
 
         self.assertTrue(array_equal(buffer @ A, test @ A))
-        self.assertTrue(array_equal(buffer @ B, test @ B))
+        self.assertTrue(allclose(buffer @ B, test @ B))
 
-        buffer.append([9, 10, 11])
+        buffer.append(arange(9, 12))
         test += 3
 
         self.assertTrue(array_equal(buffer @ A, test @ A))
-        self.assertTrue(array_equal(buffer @ B, test @ B))
+        self.assertTrue(allclose(buffer @ B, test @ B))
 
     def test_matmuln(self):
         """Tests buffer @ X where X.ndim > 2 and buffer.ndim > 2"""
         data = zeros((3, 3, 3))
         A = zeros((3, 3, 3))
-        B = arange(27).reshape(3, 3, 3)
-        C = arange(12).reshape(3, 4)
+        B = rand(27).reshape(3, 3, 3)
+        C = rand(12).reshape(3, 4)
 
         fill_diagonal(A, [1, 2, 3])
         buffer = NumpyCircularBuffer(data)
@@ -228,67 +234,67 @@ class TestNumpyCircularBuffer(unittest.TestCase):
         test = arange(27).reshape(3, 3, 3)
 
         self.assertTrue(array_equal(buffer @ A, test @ A))
-        self.assertTrue(array_equal(buffer @ B, test @ B))
+        self.assertTrue(allclose(buffer @ B, test @ B))
 
         buffer.append(filler + 27)
         test += 9
 
         self.assertTrue(array_equal(buffer @ A, test @ A))
-        self.assertTrue(array_equal(buffer @ B, test @ B))
-        self.assertTrue(array_equal(buffer @ C, test @ C))
+        self.assertTrue(allclose(buffer @ B, test @ B))
+        self.assertTrue(allclose(buffer @ C, test @ C))
 
     def test_rmatmul1(self):
         data = zeros(3)
         A = zeros(9).reshape(3, 3)
         B = arange(9).reshape(3, 3)
         C = arange(3)
-        fill_diagonal(A, [1, 2, 3])
+        fill_diagonal(A, arange(3))
 
         buffer = NumpyCircularBuffer(data)
         buffer.append(0)
         buffer.append(1)
         buffer.append(2)
 
-        self.assertTrue(array_equal(A @ buffer, A @ array([0, 1, 2])))
+        self.assertTrue(array_equal(A @ buffer, A @ arange(3)))
 
         buffer.append(3)
-        self.assertTrue(array_equal(A @ buffer, A @ array([1, 2, 3])))
-        self.assertTrue(array_equal(B @ buffer, B @ array([1, 2, 3])))
-        self.assertTrue(array_equal(C @ buffer, C @ array([1, 2, 3])))
+        self.assertTrue(array_equal(A @ buffer, A @ arange(1, 4)))
+        self.assertTrue(allclose(B @ buffer, B @ arange(1, 4)))
+        self.assertTrue(allclose(C @ buffer, C @ arange(1, 4)))
 
     def test_rmatmul_1d1d(self):
         """Tests X @ buffer where X.ndim == 1 and buffer.ndim == 1"""
 
         data = zeros(3)
-        C = arange(3)
+        C = rand(3)
 
         buffer = NumpyCircularBuffer(data)
         buffer.append(0)
-        self.assertTrue(array_equal(C[:1] @ buffer, C[:1] @ arange(1)))
+        self.assertTrue(allclose(C[:1] @ buffer, C[:1] @ arange(1)))
 
         buffer.append(1)
-        self.assertTrue(array_equal(C[:2] @ buffer, C[:2] @ arange(2)))
+        self.assertTrue(allclose(C[:2] @ buffer, C[:2] @ arange(2)))
 
         buffer.append(2)
-        self.assertTrue(array_equal(C @ buffer, C @ arange(3)))
+        self.assertTrue(allclose(C @ buffer, C @ arange(3)))
 
         buffer.append(3)
-        self.assertTrue(array_equal(C @ buffer, C @ arange(1, 4)))
+        self.assertTrue(allclose(C @ buffer, C @ arange(1, 4)))
 
         buffer.append(4)
-        self.assertTrue(array_equal(C @ buffer, C @ arange(2, 5)))
+        self.assertTrue(allclose(C @ buffer, C @ arange(2, 5)))
 
         buffer.append(5)
-        self.assertTrue(array_equal(C @ buffer, C @ arange(3, 6)))
+        self.assertTrue(allclose(C @ buffer, C @ arange(3, 6)))
 
         buffer.append(6)
-        self.assertTrue(array_equal(C @ buffer, C @ arange(4, 7)))
+        self.assertTrue(allclose(C @ buffer, C @ arange(4, 7)))
 
         buffer.pop_left()
-        self.assertTrue(array_equal(C[1:] @ buffer, C[1:] @ arange(5, 7)))
+        self.assertTrue(allclose(C[1:] @ buffer, C[1:] @ arange(5, 7)))
 
         buffer.pop_left()
-        self.assertTrue(array_equal(C[2:] @ buffer, C[2:] @ arange(6, 7)))
+        self.assertTrue(allclose(C[2:] @ buffer, C[2:] @ arange(6, 7)))
 
     def test_rmatmul_nd1d(self):
         """Tests X @ buffer where X.ndim == 1 and buffer.ndim > 1"""
@@ -308,18 +314,18 @@ class TestNumpyCircularBuffer(unittest.TestCase):
 
         buffer.append(3)
         self.assertTrue(array_equal(A @ buffer, A @ array([1, 2, 3])))
-        self.assertTrue(array_equal(B @ buffer, B @ array([1, 2, 3])))
-        self.assertTrue(array_equal(C @ buffer, C @ array([1, 2, 3])))
+        self.assertTrue(allclose(B @ buffer, B @ array([1, 2, 3])))
+        self.assertTrue(allclose(C @ buffer, C @ array([1, 2, 3])))
 
         buffer.append(4)
         self.assertTrue(array_equal(A @ buffer, A @ arange(2, 5)))
-        self.assertTrue(array_equal(B @ buffer, B @ arange(2, 5)))
-        self.assertTrue(array_equal(C @ buffer, C @ arange(2, 5)))
+        self.assertTrue(allclose(B @ buffer, B @ arange(2, 5)))
+        self.assertTrue(allclose(C @ buffer, C @ arange(2, 5)))
 
         buffer.append(5)
         self.assertTrue(array_equal(A @ buffer, A @ arange(3, 6)))
-        self.assertTrue(array_equal(B @ buffer, B @ arange(3, 6)))
-        self.assertTrue(array_equal(C @ buffer, C @ arange(3, 6)))
+        self.assertTrue(allclose(B @ buffer, B @ arange(3, 6)))
+        self.assertTrue(allclose(C @ buffer, C @ arange(3, 6)))
 
     def test_rmatmul1dnd(self):
         """Tests X @ buffer where X.ndim == 1 and buffer.ndim > 1"""
@@ -327,75 +333,75 @@ class TestNumpyCircularBuffer(unittest.TestCase):
         data1 = zeros((3, 3))
         data2 = zeros((3, 3, 3))
 
-        A = arange(3)
+        A = rand(3)
         test1 = arange(9).reshape(3, 3)
         test2 = arange(27).reshape(3, 3, 3)
 
         buffer1 = NumpyCircularBuffer(data1)
         buffer2 = NumpyCircularBuffer(data2)
 
-        buffer1.append([0, 1, 2])
-        buffer1.append([3, 4, 5])
-        buffer1.append([6, 7, 8])
+        buffer1.append(arange(3))
+        buffer1.append(arange(3, 6))
+        buffer1.append(arange(6, 9))
 
         buffer2.append(arange(9).reshape(3, 3))
         buffer2.append(arange(9, 18).reshape(3, 3))
         buffer2.append(arange(18, 27).reshape(3, 3))
 
-        self.assertTrue(array_equal(A @ buffer1, A @ test1))
-        self.assertTrue(array_equal(A @ buffer2, A @ test2))
+        self.assertTrue(allclose(A @ buffer1, A @ test1))
+        self.assertTrue(allclose(A @ buffer2, A @ test2))
 
-        buffer1.append([9, 10, 11])
+        buffer1.append(arange(9, 12))
         buffer2.append(arange(27, 36).reshape(3, 3))
         test1 += 3
         test2 += 9
 
-        self.assertTrue(array_equal(A @ buffer1, A @ test1))
-        self.assertTrue(array_equal(A @ buffer2, A @ test2))
+        self.assertTrue(allclose(A @ buffer1, A @ test1))
+        self.assertTrue(allclose(A @ buffer2, A @ test2))
 
-        buffer1.append([12, 13, 14])
+        buffer1.append(arange(12, 15))
         buffer2.append(arange(36, 45).reshape(3, 3))
         test1 += 3
         test2 += 9
 
-        self.assertTrue(array_equal(A @ buffer1, A @ test1))
-        self.assertTrue(array_equal(A @ buffer2, A @ test2))
+        self.assertTrue(allclose(A @ buffer1, A @ test1))
+        self.assertTrue(allclose(A @ buffer2, A @ test2))
 
-        buffer1.append([15, 16, 17])
+        buffer1.append(arange(15, 18))
         buffer2.append(arange(45, 54).reshape(3, 3))
         test1 += 3
         test2 += 9
 
-        self.assertTrue(array_equal(A @ buffer1, A @ test1))
-        self.assertTrue(array_equal(A @ buffer2, A @ test2))
+        self.assertTrue(allclose(A @ buffer1, A @ test1))
+        self.assertTrue(allclose(A @ buffer2, A @ test2))
 
     def test_rmatmul_2d2d(self):
         data = zeros((3, 3))
         A = zeros(9).reshape(3, 3)
-        B = arange(9).reshape(3, 3)
-        C = arange(12).reshape(4, 3)
+        B = rand(9).reshape(3, 3)
+        C = rand(12).reshape(4, 3)
 
-        fill_diagonal(A, [1, 2, 3])
+        fill_diagonal(A, arange(1, 4))
         buffer = NumpyCircularBuffer(data)
 
-        buffer.append([0, 1, 2])
-        buffer.append([3, 4, 5])
-        buffer.append([6, 7, 8])
+        buffer.append(arange(3))
+        buffer.append(arange(3, 6))
+        buffer.append(arange(6, 9))
 
         test = arange(9).reshape(3, 3)
 
         self.assertTrue(array_equal(buffer, test))
 
         self.assertTrue(array_equal(A @ buffer, A @ test))
-        self.assertTrue(array_equal(B @ buffer, B @ test))
-        self.assertTrue(array_equal(C @ buffer, C @ test))
+        self.assertTrue(allclose(B @ buffer, B @ test))
+        self.assertTrue(allclose(C @ buffer, C @ test))
 
         buffer.append([9, 10, 11])
         test += 3
 
         self.assertTrue(array_equal(A @ buffer, A @ test))
-        self.assertTrue(array_equal(B @ buffer, B @ test))
-        self.assertTrue(array_equal(C @ buffer, C @ test))
+        self.assertTrue(allclose(B @ buffer, B @ test))
+        self.assertTrue(allclose(C @ buffer, C @ test))
 
     def test_rmatmul_ndnd(self):
         data = zeros((3, 3, 3))
@@ -414,15 +420,15 @@ class TestNumpyCircularBuffer(unittest.TestCase):
         test = arange(27).reshape(3, 3, 3)
 
         self.assertTrue(array_equal(A @ buffer, A @ test))
-        self.assertTrue(array_equal(B @ buffer, B @ test))
-        self.assertTrue(array_equal(C @ buffer, C @ test))
+        self.assertTrue(allclose(B @ buffer, B @ test))
+        self.assertTrue(allclose(C @ buffer, C @ test))
 
         buffer.append(filler + 27)
         test += 9
 
         self.assertTrue(array_equal(A @ buffer, A @ test))
-        self.assertTrue(array_equal(B @ buffer, B @ test))
-        self.assertTrue(array_equal(C @ buffer, C @ test))
+        self.assertTrue(allclose(B @ buffer, B @ test))
+        self.assertTrue(allclose(C @ buffer, C @ test))
 
     def test_forward_1d(self):
         data = zeros(3)
