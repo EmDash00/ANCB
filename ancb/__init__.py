@@ -329,8 +329,8 @@ class NumpyCircularBuffer(ndarray):
                     if self.fragmented:
                         k = self._capacity - self._begin  # fragmentation index
 
-                        matmul(x[k:], self[self._begin:], out[k:])
-                        matmul(x[:k], self[:self._end], out[:k])
+                        matmul(x, self[self._begin:], out[:k])
+                        matmul(x, self[:self._end], out[k:])
                     else:
                         if self._begin < self._end:
                             part = self[self._begin:self._end]
