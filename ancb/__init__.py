@@ -131,7 +131,7 @@ class NumpyCircularBuffer(ndarray):
 
                     out = matmul(part, x)
 
-                return(out)
+                return(out.view(ndarray))
             else:
                 raise ValueError(
                     "matmul: Input operand 1 has a mismatch in its core "
@@ -292,7 +292,7 @@ class NumpyCircularBuffer(ndarray):
 
                     out = matmul(x, part)
 
-                return(out)
+                return(out.view(ndarray))
             else:
                 raise ValueError(
                     "matmul: Input operand 1 has a mismatch in its core "
