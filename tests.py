@@ -7,10 +7,16 @@ from ancb import (  # type: ignore
 
 from numpy import array_equal, allclose
 from numpy import array, zeros, arange
-from numpy.random import rand
+from numpy.random import rand, randint
 from numpy import fill_diagonal
 
-from itertools import zip_longest
+from itertools import zip_longest, chain
+
+from operator import (
+    matmul, add, sub, mul, truediv, mod, floordiv, pow,
+    rshift, lshift, and_, or_, xor, neg, pos, abs, inv, invert
+
+)
 
 
 class TestBroadcastability(unittest.TestCase):
@@ -74,7 +80,97 @@ class TestBroadcastability(unittest.TestCase):
         self.assertTrue(star_can_broadcast(starexpr))
 
 
-class TestNumpyCircularBuffer(unittest.TestCase):
+class OperatorTestFactory(type):
+
+    def __new__(cls, name, bases, dct):
+        obj = super().__new__(cls, name, bases, dct)
+
+        bin_operators = [
+            matmul, add, sub, mul, truediv, mod, floordiv, pow
+        ]
+
+        un_operators = [neg, pos, abs, invert, inv]
+
+        bitbin_operators = [rshift, lshift, and_, or_, xor]
+
+        def unop_testcase(op):
+            def f(self):
+                data = zeros(3, dtype=int)
+                test = -arange(3, dtype=int)
+
+                buffer = NumpyCircularBuffer(data)
+                buffer.append(0)
+                buffer.append(-1)
+                buffer.append(-2)
+
+                self.assertTrue(array_equal(op(buffer), op(test)))  # unfrag
+
+                buffer.append(-3)
+                test -= 1
+
+                self.assertTrue(array_equal(op(buffer), op(test)))  # fragmented
+
+            return f
+
+        def bitbinop_testcase(op):
+            def f(self):
+                data = zeros(3, dtype=int)
+                test = arange(1, 4, dtype=int)
+
+                x = randint(3)
+
+                buffer = NumpyCircularBuffer(data)
+                buffer.append(1)
+                buffer.append(2)
+                buffer.append(3)
+
+                self.assertTrue(array_equal(op(buffer, x), op(test, x)))
+                self.assertTrue(array_equal(op(x, buffer), op(x, test)))
+
+                buffer.append(4)
+                test += 1
+
+                self.assertTrue(array_equal(op(buffer, x), op(test, x)))
+                self.assertTrue(array_equal(op(x, buffer), op(x, test)))
+            return f
+
+        def binop_testcase(op):
+            def f(self):
+                data = zeros(3, dtype=float)
+                test = arange(1, 4, dtype=float)
+
+                x = rand(3)
+
+                buffer = NumpyCircularBuffer(data)
+                buffer.append(1)
+                buffer.append(2)
+                buffer.append(3)
+
+                self.assertTrue(allclose(op(buffer, x), op(test, x)))
+                self.assertTrue(allclose(op(x, buffer), op(x, test)))
+
+                buffer.append(4)
+                test += 1
+
+                self.assertTrue(allclose(op(buffer, x), op(test, x)))
+                self.assertTrue(allclose(op(x, buffer), op(x, test)))
+            return f
+
+        for op in bin_operators:
+            setattr(obj, 'test_{}'.format(op.__name__), binop_testcase(op))
+
+        for op in bitbin_operators:
+            setattr(obj, 'test_{}'.format(op.__name__), bitbinop_testcase(op))
+
+        for op in un_operators:
+            setattr(obj, 'test_{}'.format(op.__name__), unop_testcase(op))
+
+        return(obj)
+
+
+class TestNumpyCircularBuffer(
+    unittest.TestCase, metaclass=OperatorTestFactory
+):
     """
     NumpyCircularBuffer tests
     """
@@ -117,6 +213,7 @@ class TestNumpyCircularBuffer(unittest.TestCase):
         buffer.pop_left()
         self.assertFalse(buffer.fragmented)
 
+    """
     def test_add(self):
         data = zeros(3)
         x = arange(3)
@@ -134,6 +231,7 @@ class TestNumpyCircularBuffer(unittest.TestCase):
         self.assertTrue(array_equal((x + 1) + buffer, (x + 1) * 2))
 
         buffer.pop_left()
+    """
 
     def test_matmul_1d1d(self):
         """Tests buffer @ X where buffer.ndim == 1 and X.ndim == 1"""
