@@ -424,19 +424,23 @@ class TestNumpyCircularBuffer(unittest.TestCase):
         self.assertTrue(array_equal(B @ buffer, B @ test))
         self.assertTrue(array_equal(C @ buffer, C @ test))
 
-    def test_forward(self):
+    def test_forward_1d(self):
         data = zeros(3)
+        test = zeros(3)
 
         buffer = NumpyCircularBuffer(data)
 
         buffer.append(1)
-        self.assertTrue(array_equal(buffer, array([1, 0, 0])))
+        test[0] = 1
+        self.assertTrue(array_equal(buffer, test))
 
         buffer.append(2)
-        self.assertTrue(array_equal(buffer, array([1, 2, 0])))
+        test[1] = 2
+        self.assertTrue(array_equal(buffer, test))
 
         buffer.append(3)
-        self.assertTrue(array_equal(buffer, array([1, 2, 3])))
+        test[2] = 3
+        self.assertTrue(array_equal(buffer, test))
 
         self.assertTrue(buffer.full)
 
@@ -450,48 +454,19 @@ class TestNumpyCircularBuffer(unittest.TestCase):
         data = zeros((3, 3, 3))
 
         buffer = NumpyCircularBuffer(data)
+        test = zeros((3, 3, 3))
 
         buffer.append(1)
-        self.assertTrue(
-            array_equal(
-                buffer,
-                array(
-                    [
-                        [[1, 1, 1], [1, 1, 1], [1, 1, 1]],
-                        [[0, 0, 0], [0, 0, 0], [0, 0, 0]],
-                        [[0, 0, 0], [0, 0, 0], [0, 0, 0]]
-                    ]
-                )
-            )
-        )
+        test[0] = 1
+        self.assertTrue(array_equal(buffer, test))
 
         buffer.append(2)
-        self.assertTrue(
-            array_equal(
-                buffer,
-                array(
-                    [
-                        [[1, 1, 1], [1, 1, 1], [1, 1, 1]],
-                        [[2, 2, 2], [2, 2, 2], [2, 2, 2]],
-                        [[0, 0, 0], [0, 0, 0], [0, 0, 0]]
-                    ]
-                )
-            )
-        )
+        test[1] = 2
+        self.assertTrue(array_equal(buffer, test))
 
         buffer.append(3)
-        self.assertTrue(
-            array_equal(
-                buffer,
-                array(
-                    [
-                        [[1, 1, 1], [1, 1, 1], [1, 1, 1]],
-                        [[2, 2, 2], [2, 2, 2], [2, 2, 2]],
-                        [[3, 3, 3], [3, 3, 3], [3, 3, 3]]
-                    ]
-                )
-            )
-        )
+        test[2] = 3
+        self.assertTrue(array_equal(buffer, test))
 
         self.assertTrue(buffer.full)
 
