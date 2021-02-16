@@ -189,7 +189,7 @@ class TestNumpyCircularBuffer(unittest.TestCase):
         self.assertTrue(allclose(buffer @ A, arange(1, 4) @ A))
         self.assertTrue(allclose(buffer @ B, arange(1, 4) @ B))
 
-    def test_matmul2(self):
+    def test_matmul_2d2d(self):
         """Tests buffer @ X where buffer.ndim == 2"""
 
         data = zeros((3, 3))
@@ -216,7 +216,7 @@ class TestNumpyCircularBuffer(unittest.TestCase):
         self.assertTrue(array_equal(buffer @ A, test @ A))
         self.assertTrue(allclose(buffer @ B, test @ B))
 
-    def test_matmuln(self):
+    def test_matmul_ndnd(self):
         """Tests buffer @ X where X.ndim > 2 and buffer.ndim > 2"""
         data = zeros((3, 3, 3))
         A = zeros((3, 3, 3))
@@ -242,25 +242,6 @@ class TestNumpyCircularBuffer(unittest.TestCase):
         self.assertTrue(array_equal(buffer @ A, test @ A))
         self.assertTrue(allclose(buffer @ B, test @ B))
         self.assertTrue(allclose(buffer @ C, test @ C))
-
-    def test_rmatmul1(self):
-        data = zeros(3)
-        A = zeros(9).reshape(3, 3)
-        B = arange(9).reshape(3, 3)
-        C = arange(3)
-        fill_diagonal(A, arange(3))
-
-        buffer = NumpyCircularBuffer(data)
-        buffer.append(0)
-        buffer.append(1)
-        buffer.append(2)
-
-        self.assertTrue(array_equal(A @ buffer, A @ arange(3)))
-
-        buffer.append(3)
-        self.assertTrue(array_equal(A @ buffer, A @ arange(1, 4)))
-        self.assertTrue(allclose(B @ buffer, B @ arange(1, 4)))
-        self.assertTrue(allclose(C @ buffer, C @ arange(1, 4)))
 
     def test_rmatmul_1d1d(self):
         """Tests X @ buffer where X.ndim == 1 and buffer.ndim == 1"""
@@ -327,7 +308,7 @@ class TestNumpyCircularBuffer(unittest.TestCase):
         self.assertTrue(allclose(B @ buffer, B @ arange(3, 6)))
         self.assertTrue(allclose(C @ buffer, C @ arange(3, 6)))
 
-    def test_rmatmul1dnd(self):
+    def test_rmatmul_1dnd(self):
         """Tests X @ buffer where X.ndim == 1 and buffer.ndim > 1"""
 
         data1 = zeros((3, 3))
