@@ -373,6 +373,7 @@ class TestNumpyCircularBuffer(unittest.TestCase):
         data = zeros((3, 3))
         A = zeros(9).reshape(3, 3)
         B = arange(9).reshape(3, 3)
+        C = arange(12).reshape(4, 3)
 
         fill_diagonal(A, [1, 2, 3])
         buffer = NumpyCircularBuffer(data)
@@ -387,18 +388,20 @@ class TestNumpyCircularBuffer(unittest.TestCase):
 
         self.assertTrue(array_equal(A @ buffer, A @ test))
         self.assertTrue(array_equal(B @ buffer, B @ test))
+        self.assertTrue(array_equal(C @ buffer, C @ test))
 
         buffer.append([9, 10, 11])
         test += 3
 
         self.assertTrue(array_equal(A @ buffer, A @ test))
         self.assertTrue(array_equal(B @ buffer, B @ test))
+        self.assertTrue(array_equal(C @ buffer, C @ test))
 
-    def test_rmatmuln(self):
+    def test_rmatmul_ndnd(self):
         data = zeros((3, 3, 3))
         A = zeros(27).reshape(3, 3, 3)
         B = arange(27).reshape(3, 3, 3)
-        C = arange(12).reshape(4, 3)
+        C = arange(3*8*3).reshape(3, 8, 3)
 
         fill_diagonal(A, [1, 2, 3])
         buffer = NumpyCircularBuffer(data)
