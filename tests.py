@@ -213,26 +213,6 @@ class TestNumpyCircularBuffer(
         buffer.pop_left()
         self.assertFalse(buffer.fragmented)
 
-    """
-    def test_add(self):
-        data = zeros(3)
-        x = arange(3)
-
-        buffer = NumpyCircularBuffer(data)
-        buffer.append(0)
-        buffer.append(1)
-        buffer.append(2)
-
-        self.assertTrue(array_equal(buffer + x, x * 2))
-        self.assertTrue(array_equal(x + buffer, x * 2))
-
-        buffer.append(3)
-        self.assertTrue(array_equal(buffer + (x + 1), (x + 1) * 2))
-        self.assertTrue(array_equal((x + 1) + buffer, (x + 1) * 2))
-
-        buffer.pop_left()
-    """
-
     def test_matmul_1d1d(self):
         """Tests buffer @ X where buffer.ndim == 1 and X.ndim == 1"""
 
