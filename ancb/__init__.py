@@ -121,17 +121,17 @@ class NumpyCircularBuffer(ndarray):
                 if self.fragmented:
                     k = self._capacity - self._begin  # fragmentation index
 
-                    out = matmul(self[self._begin:], x[:k])
-                    out += matmul(self[:self._end], x[k:])
+                    out = matmul(self[self._begin:], x[:k]).view(ndarray)
+                    out += matmul(self[:self._end], x[k:]).view(ndarray)
                 else:
                     if self._begin < self._end:
                         part = self[self._begin:self._end]
                     elif self._end == 0:
                         part = self[self._begin:]
 
-                    out = matmul(part, x)
+                    out = matmul(part, x).view(ndarray)
 
-                return(out.view(ndarray))
+                return(out)
             else:
                 raise ValueError(
                     "matmul: Input operand 1 has a mismatch in its core "
@@ -149,14 +149,14 @@ class NumpyCircularBuffer(ndarray):
                     k = self._capacity - self._begin  # fragmentation index
 
                     matmul(self[self._begin:], x[..., :k, :], out)
-                    out += matmul(self[:self._end], x[..., k:, :])
+                    out += matmul(self[:self._end], x[..., k:, :]).view(ndarray)
                 else:
                     if self._begin < self._end:
                         part = self[self._begin:self._end]
                     elif self._end == 0:
                         part = self[self._begin:]
 
-                    matmul(part, x, out)
+                    matmul(part, x, out).view(ndarray)
 
                 return(out)
             else:
@@ -238,7 +238,7 @@ class NumpyCircularBuffer(ndarray):
 
                     return(out.view(ndarray))
                 else:
-                    print(
+                    raise ValueError(
                         (
                             "operands could not be broadcast together with"
                             "remapped shapes [original->remapped]: "
@@ -266,6 +266,10 @@ class NumpyCircularBuffer(ndarray):
                     )
                 )
 
+    def __imatmul__(self, x):
+        raise TypeError("In-place matrix multiplication is not (yet) "
+                        "supported. Use 'a = a @ b' instead of 'a @= b'")
+
     def __rmatmul__(self, x):
         x = asarray(x)
 
@@ -282,8 +286,8 @@ class NumpyCircularBuffer(ndarray):
                 if self.fragmented:
                     k = self._capacity - self._begin  # fragmentation index
 
-                    out = matmul(x[:k], self[self._begin:])
-                    out += matmul(x[k:], self[:self._end])
+                    out = matmul(x[:k], self[self._begin:]).view(ndarray)
+                    out += matmul(x[k:], self[:self._end]).view(ndarray)
                 else:
                     if self._begin < self._end:
                         part = self[self._begin:self._end]
@@ -311,7 +315,7 @@ class NumpyCircularBuffer(ndarray):
                         k = self._capacity - self._begin  # fragmentation index
 
                         matmul(x[:k], self[self._begin:], out)
-                        out += matmul(x[k:], self[:self._end])
+                        out += matmul(x[k:], self[:self._end]).view(ndarray)
                     else:
                         if self._begin < self._end:
                             part = self[self._begin:self._end]
@@ -356,7 +360,7 @@ class NumpyCircularBuffer(ndarray):
                     k = self._capacity - self._begin  # fragmentation index
 
                     matmul(x[..., :, :k], self[self._begin:], out)
-                    out += matmul(x[..., :, k:], self[:self._end])
+                    out += matmul(x[..., :, k:], self[:self._end]).view(ndarray)
                 else:
                     if self._begin < self._end:
                         part = self[self._begin:self._end]
@@ -385,7 +389,7 @@ class NumpyCircularBuffer(ndarray):
                     k = self._capacity - self._begin  # fragmentation index
 
                     matmul(x[..., :, :k], self[self._begin:], out)
-                    out += matmul(x[..., :, k:], self[:self._end])
+                    out += matmul(x[..., :, k:], self[:self._end]).view(ndarray)
 
                 else:
                     if self._begin < self._end:
@@ -446,7 +450,7 @@ class NumpyCircularBuffer(ndarray):
 
                     return(out.view(ndarray))
                 else:
-                    print(
+                    raise ValueError(
                         (
                             "operands could not be broadcast together with"
                             "remapped shapes [original->remapped]: "
@@ -508,7 +512,6 @@ class NumpyCircularBuffer(ndarray):
                 else:
                     add(self[self._begin:], x, out[:k])
                     add(self[:self._end], x, out[k:])
-
             else:
                 if self._begin < self._end:
                     part = self[self._begin:self._end]
@@ -561,6 +564,38 @@ class NumpyCircularBuffer(ndarray):
                 "together with shapes {} {}".format(
                     x.shape,
                     (self._size, *self.shape[1:])
+                )
+            )
+
+    def __iadd__(self, x):
+        x = asarray(x)
+
+        self_shape = (self._size, *self.shape[1:])
+        starexpr = tuple(zip_longest(self_shape, x.shape, fillvalue=1))
+
+        if star_can_broadcast(starexpr):
+            if self.fragmented:
+                k = self._capacity - self._begin  # fragmentation index
+                if x.ndim >= 1:
+                    add(self[self._begin:], x[:k], self[self._begin:])
+                    add(self[:self._end], x[k:], self[:self._end])
+                else:
+                    add(self[self._begin:], x, self[self._begin:])
+                    add(self[:self._end], x, self[:self._end])
+
+            else:
+                if self._begin < self._end:
+                    part = self[self._begin:self._end]
+                elif self._end == 0:
+                    part = self[self._begin:]
+
+                add(part, x, part)
+        else:
+            raise ValueError(
+                "operands could not be broadcast "
+                "together with shapes {} {}".format(
+                    (self._size, *self.shape[1:]),
+                    x.shape
                 )
             )
 
@@ -637,6 +672,38 @@ class NumpyCircularBuffer(ndarray):
                 )
             )
 
+    def __isub__(self, x):
+        x = asarray(x)
+
+        self_shape = (self._size, *self.shape[1:])
+        starexpr = tuple(zip_longest(self_shape, x.shape, fillvalue=1))
+
+        if star_can_broadcast(starexpr):
+            if self.fragmented:
+                k = self._capacity - self._begin  # fragmentation index
+                if x.ndim >= 1:
+                    subtract(self[self._begin:], x[:k], self[self._begin:])
+                    subtract(self[:self._end], x[k:], self[:self._end])
+                else:
+                    subtract(self[self._begin:], x, self[self._begin:])
+                    subtract(self[:self._end], x, self[:self._end])
+
+            else:
+                if self._begin < self._end:
+                    part = self[self._begin:self._end]
+                elif self._end == 0:
+                    part = self[self._begin:]
+
+                subtract(part, x, part)
+        else:
+            raise ValueError(
+                "operands could not be broadcast "
+                "together with shapes {} {}".format(
+                    (self._size, *self.shape[1:]),
+                    x.shape
+                )
+            )
+
     def __mul__(self, x):
         x = asarray(x)
 
@@ -707,6 +774,38 @@ class NumpyCircularBuffer(ndarray):
                 "together with shapes {} {}".format(
                     x.shape,
                     (self._size, *self.shape[1:])
+                )
+            )
+
+    def __imul__(self, x):
+        x = asarray(x)
+
+        self_shape = (self._size, *self.shape[1:])
+        starexpr = tuple(zip_longest(self_shape, x.shape, fillvalue=1))
+
+        if star_can_broadcast(starexpr):
+            if self.fragmented:
+                k = self._capacity - self._begin  # fragmentation index
+                if x.ndim >= 1:
+                    multiply(self[self._begin:], x[:k], self[self._begin:])
+                    multiply(self[:self._end], x[k:], self[:self._end])
+                else:
+                    multiply(self[self._begin:], x, self[self._begin:])
+                    multiply(self[:self._end], x, self[:self._end])
+
+            else:
+                if self._begin < self._end:
+                    part = self[self._begin:self._end]
+                elif self._end == 0:
+                    part = self[self._begin:]
+
+                multiply(part, x, part)
+        else:
+            raise ValueError(
+                "operands could not be broadcast "
+                "together with shapes {} {}".format(
+                    (self._size, *self.shape[1:]),
+                    x.shape
                 )
             )
 
@@ -783,6 +882,38 @@ class NumpyCircularBuffer(ndarray):
                 )
             )
 
+    def __itruediv__(self, x):
+        x = asarray(x)
+
+        self_shape = (self._size, *self.shape[1:])
+        starexpr = tuple(zip_longest(self_shape, x.shape, fillvalue=1))
+
+        if star_can_broadcast(starexpr):
+            if self.fragmented:
+                k = self._capacity - self._begin  # fragmentation index
+                if x.ndim >= 1:
+                    divide(self[self._begin:], x[:k], self[self._begin:])
+                    divide(self[:self._end], x[k:], self[:self._end])
+                else:
+                    divide(self[self._begin:], x, self[self._begin:])
+                    divide(self[:self._end], x, self[:self._end])
+
+            else:
+                if self._begin < self._end:
+                    part = self[self._begin:self._end]
+                elif self._end == 0:
+                    part = self[self._begin:]
+
+                divide(part, x, part)
+        else:
+            raise ValueError(
+                "operands could not be broadcast "
+                "together with shapes {} {}".format(
+                    (self._size, *self.shape[1:]),
+                    x.shape
+                )
+            )
+
     def __floordiv__(self, x):
         x = asarray(x)
 
@@ -853,6 +984,38 @@ class NumpyCircularBuffer(ndarray):
                 "together with shapes {} {}".format(
                     x.shape,
                     (self._size, *self.shape[1:])
+                )
+            )
+
+    def __ifloordiv__(self, x):
+        x = asarray(x)
+
+        self_shape = (self._size, *self.shape[1:])
+        starexpr = tuple(zip_longest(self_shape, x.shape, fillvalue=1))
+
+        if star_can_broadcast(starexpr):
+            if self.fragmented:
+                k = self._capacity - self._begin  # fragmentation index
+                if x.ndim >= 1:
+                    floor_divide(self[self._begin:], x[:k], self[self._begin:])
+                    floor_divide(self[:self._end], x[k:], self[:self._end])
+                else:
+                    floor_divide(self[self._begin:], x, self[self._begin:])
+                    floor_divide(self[:self._end], x, self[:self._end])
+
+            else:
+                if self._begin < self._end:
+                    part = self[self._begin:self._end]
+                elif self._end == 0:
+                    part = self[self._begin:]
+
+                floor_divide(part, x, part)
+        else:
+            raise ValueError(
+                "operands could not be broadcast "
+                "together with shapes {} {}".format(
+                    (self._size, *self.shape[1:]),
+                    x.shape
                 )
             )
 
@@ -929,6 +1092,38 @@ class NumpyCircularBuffer(ndarray):
                 )
             )
 
+    def __imod__(self, x):
+        x = asarray(x)
+
+        self_shape = (self._size, *self.shape[1:])
+        starexpr = tuple(zip_longest(self_shape, x.shape, fillvalue=1))
+
+        if star_can_broadcast(starexpr):
+            if self.fragmented:
+                k = self._capacity - self._begin  # fragmentation index
+                if x.ndim >= 1:
+                    mod(self[self._begin:], x[:k], self[self._begin:])
+                    mod(self[:self._end], x[k:], self[:self._end])
+                else:
+                    mod(self[self._begin:], x, self[self._begin:])
+                    mod(self[:self._end], x, self[:self._end])
+
+            else:
+                if self._begin < self._end:
+                    part = self[self._begin:self._end]
+                elif self._end == 0:
+                    part = self[self._begin:]
+
+                mod(part, x, part)
+        else:
+            raise ValueError(
+                "operands could not be broadcast "
+                "together with shapes {} {}".format(
+                    (self._size, *self.shape[1:]),
+                    x.shape
+                )
+            )
+
     def __pow__(self, x):
         x = asarray(x)
 
@@ -1002,6 +1197,38 @@ class NumpyCircularBuffer(ndarray):
                 )
             )
 
+    def __ipow__(self, x):
+        x = asarray(x)
+
+        self_shape = (self._size, *self.shape[1:])
+        starexpr = tuple(zip_longest(self_shape, x.shape, fillvalue=1))
+
+        if star_can_broadcast(starexpr):
+            if self.fragmented:
+                k = self._capacity - self._begin  # fragmentation index
+                if x.ndim >= 1:
+                    power(self[self._begin:], x[:k], self[self._begin:])
+                    power(self[:self._end], x[k:], self[:self._end])
+                else:
+                    power(self[self._begin:], x, self[self._begin:])
+                    power(self[:self._end], x, self[:self._end])
+
+            else:
+                if self._begin < self._end:
+                    part = self[self._begin:self._end]
+                elif self._end == 0:
+                    part = self[self._begin:]
+
+                power(part, x, part)
+        else:
+            raise ValueError(
+                "operands could not be broadcast "
+                "together with shapes {} {}".format(
+                    (self._size, *self.shape[1:]),
+                    x.shape
+                )
+            )
+
     def __and__(self, x):
         x = asarray(x)
 
@@ -1071,6 +1298,38 @@ class NumpyCircularBuffer(ndarray):
                 "together with shapes {} {}".format(
                     x.shape,
                     (self._size, *self.shape[1:])
+                )
+            )
+
+    def __iand__(self, x):
+        x = asarray(x)
+
+        self_shape = (self._size, *self.shape[1:])
+        starexpr = tuple(zip_longest(self_shape, x.shape, fillvalue=1))
+
+        if star_can_broadcast(starexpr):
+            if self.fragmented:
+                k = self._capacity - self._begin  # fragmentation index
+                if x.ndim >= 1:
+                    bitwise_and(self[self._begin:], x[:k], self[self._begin:])
+                    bitwise_and(self[:self._end], x[k:], self[:self._end])
+                else:
+                    bitwise_and(self[self._begin:], x, self[self._begin:])
+                    bitwise_and(self[:self._end], x, self[:self._end])
+
+            else:
+                if self._begin < self._end:
+                    part = self[self._begin:self._end]
+                elif self._end == 0:
+                    part = self[self._begin:]
+
+                bitwise_and(part, x, part)
+        else:
+            raise ValueError(
+                "operands could not be broadcast "
+                "together with shapes {} {}".format(
+                    (self._size, *self.shape[1:]),
+                    x.shape
                 )
             )
 
@@ -1148,6 +1407,38 @@ class NumpyCircularBuffer(ndarray):
                 )
             )
 
+    def __ior__(self, x):
+        x = asarray(x)
+
+        self_shape = (self._size, *self.shape[1:])
+        starexpr = tuple(zip_longest(self_shape, x.shape, fillvalue=1))
+
+        if star_can_broadcast(starexpr):
+            if self.fragmented:
+                k = self._capacity - self._begin  # fragmentation index
+                if x.ndim >= 1:
+                    bitwise_or(self[self._begin:], x[:k], self[self._begin:])
+                    bitwise_or(self[:self._end], x[k:], self[:self._end])
+                else:
+                    bitwise_or(self[self._begin:], x, self[self._begin:])
+                    bitwise_or(self[:self._end], x, self[:self._end])
+
+            else:
+                if self._begin < self._end:
+                    part = self[self._begin:self._end]
+                elif self._end == 0:
+                    part = self[self._begin:]
+
+                bitwise_or(part, x, part)
+        else:
+            raise ValueError(
+                "operands could not be broadcast "
+                "together with shapes {} {}".format(
+                    (self._size, *self.shape[1:]),
+                    x.shape
+                )
+            )
+
     def __xor__(self, x):
         x = asarray(x)
 
@@ -1219,6 +1510,38 @@ class NumpyCircularBuffer(ndarray):
                 "together with shapes {} {}".format(
                     x.shape,
                     (self._size, *self.shape[1:])
+                )
+            )
+
+    def __ixor__(self, x):
+        x = asarray(x)
+
+        self_shape = (self._size, *self.shape[1:])
+        starexpr = tuple(zip_longest(self_shape, x.shape, fillvalue=1))
+
+        if star_can_broadcast(starexpr):
+            if self.fragmented:
+                k = self._capacity - self._begin  # fragmentation index
+                if x.ndim >= 1:
+                    bitwise_xor(self[self._begin:], x[:k], self[self._begin:])
+                    bitwise_xor(self[:self._end], x[k:], self[:self._end])
+                else:
+                    bitwise_xor(self[self._begin:], x, self[self._begin:])
+                    bitwise_xor(self[:self._end], x, self[:self._end])
+
+            else:
+                if self._begin < self._end:
+                    part = self[self._begin:self._end]
+                elif self._end == 0:
+                    part = self[self._begin:]
+
+                bitwise_xor(part, x, part)
+        else:
+            raise ValueError(
+                "operands could not be broadcast "
+                "together with shapes {} {}".format(
+                    (self._size, *self.shape[1:]),
+                    x.shape
                 )
             )
 
@@ -1294,6 +1617,38 @@ class NumpyCircularBuffer(ndarray):
                 )
             )
 
+    def __irshift__(self, x):
+        x = asarray(x)
+
+        self_shape = (self._size, *self.shape[1:])
+        starexpr = tuple(zip_longest(self_shape, x.shape, fillvalue=1))
+
+        if star_can_broadcast(starexpr):
+            if self.fragmented:
+                k = self._capacity - self._begin  # fragmentation index
+                if x.ndim >= 1:
+                    right_shift(self[self._begin:], x[:k], self[self._begin:])
+                    right_shift(self[:self._end], x[k:], self[:self._end])
+                else:
+                    right_shift(self[self._begin:], x, self[self._begin:])
+                    right_shift(self[:self._end], x, self[:self._end])
+
+            else:
+                if self._begin < self._end:
+                    part = self[self._begin:self._end]
+                elif self._end == 0:
+                    part = self[self._begin:]
+
+                right_shift(part, x, part)
+        else:
+            raise ValueError(
+                "operands could not be broadcast "
+                "together with shapes {} {}".format(
+                    (self._size, *self.shape[1:]),
+                    x.shape
+                )
+            )
+
     def __lshift__(self, x):
         x = asarray(x)
 
@@ -1357,6 +1712,38 @@ class NumpyCircularBuffer(ndarray):
                 left_shift(x, part, out)
 
             return(out.view(ndarray))
+        else:
+            raise ValueError(
+                "operands could not be broadcast "
+                "together with shapes {} {}".format(
+                    (self._size, *self.shape[1:]),
+                    x.shape
+                )
+            )
+
+    def __ilshift__(self, x):
+        x = asarray(x)
+
+        self_shape = (self._size, *self.shape[1:])
+        starexpr = tuple(zip_longest(self_shape, x.shape, fillvalue=1))
+
+        if star_can_broadcast(starexpr):
+            if self.fragmented:
+                k = self._capacity - self._begin  # fragmentation index
+                if x.ndim >= 1:
+                    left_shift(self[self._begin:], x[:k], self[self._begin:])
+                    left_shift(self[:self._end], x[k:], self[:self._end])
+                else:
+                    left_shift(self[self._begin:], x, self[self._begin:])
+                    left_shift(self[:self._end], x, self[:self._end])
+
+            else:
+                if self._begin < self._end:
+                    part = self[self._begin:self._end]
+                elif self._end == 0:
+                    part = self[self._begin:]
+
+                left_shift(part, x, part)
         else:
             raise ValueError(
                 "operands could not be broadcast "
