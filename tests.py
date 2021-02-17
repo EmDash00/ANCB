@@ -6,7 +6,7 @@ from ancb import (  # type: ignore
 )
 
 from numpy import array_equal, allclose
-from numpy import array, zeros, arange
+from numpy import array, zeros, arange, ndarray
 from numpy.random import rand, randint
 from numpy import fill_diagonal
 
@@ -14,8 +14,9 @@ from itertools import zip_longest
 
 from operator import (
     matmul, add, sub, mul, truediv, mod, floordiv, pow,
-    rshift, lshift, and_, or_, xor, neg, pos, abs, inv, invert
-
+    rshift, lshift, and_, or_, xor, neg, pos, abs, inv, invert,
+    iadd, iand, ifloordiv, ilshift, imod, imul,
+    ior, ipow, irshift, isub, itruediv, ixor
 )
 
 
@@ -93,6 +94,14 @@ class OperatorTestFactory(type):
 
         bitbin_operators = [rshift, lshift, and_, or_, xor]
 
+        i_operators = [
+            iadd, ifloordiv, imul, ipow, isub, itruediv
+        ]
+
+        bit_ioperators = [
+            ilshift, irshift, ior, iand, ixor, imod
+        ]
+
         def unop_testcase(op):
             def f(self):
                 data = zeros(3, dtype=int)
@@ -103,12 +112,16 @@ class OperatorTestFactory(type):
                 buffer.append(-1)
                 buffer.append(-2)
 
-                self.assertTrue(array_equal(op(buffer), op(test)))  # unfrag
+                res = op(buffer)
+                self.assertIsInstance(res, ndarray)
+                self.assertTrue(array_equal(res, op(test)))  # unfrag
 
                 buffer.append(-3)
                 test -= 1
 
-                self.assertTrue(array_equal(op(buffer), op(test)))  # frag
+                res = op(buffer)
+                self.assertIsInstance(res, ndarray)
+                self.assertTrue(array_equal(res, op(test)))  # frag
 
             return f
 
@@ -124,14 +137,24 @@ class OperatorTestFactory(type):
                 buffer.append(2)
                 buffer.append(3)
 
-                self.assertTrue(array_equal(op(buffer, x), op(test, x)))
-                self.assertTrue(array_equal(op(x, buffer), op(x, test)))
+                res1 = op(buffer, x)
+                res2 = op(x, buffer)
+                self.assertIsInstance(res1, ndarray)
+                self.assertIsInstance(res2, ndarray)
+
+                self.assertTrue(array_equal(res1, op(test, x)))
+                self.assertTrue(array_equal(res2, op(x, test)))
 
                 buffer.append(4)
                 test += 1
 
-                self.assertTrue(array_equal(op(buffer, x), op(test, x)))
-                self.assertTrue(array_equal(op(x, buffer), op(x, test)))
+                res1 = op(buffer, x)
+                res2 = op(x, buffer)
+                self.assertIsInstance(res1, ndarray)
+                self.assertIsInstance(res2, ndarray)
+
+                self.assertTrue(array_equal(res1, op(test, x)))
+                self.assertTrue(array_equal(res2, op(x, test)))
             return f
 
         def binop_testcase(op):
@@ -146,14 +169,94 @@ class OperatorTestFactory(type):
                 buffer.append(2)
                 buffer.append(3)
 
-                self.assertTrue(allclose(op(buffer, x), op(test, x)))
-                self.assertTrue(allclose(op(x, buffer), op(x, test)))
+                res1 = op(buffer, x)
+                self.assertIsInstance(res1, ndarray)
+                self.assertTrue(allclose(res1, op(test, x)))
+
+                res2 = op(x, buffer)
+                self.assertIsInstance(res2, ndarray)
+                self.assertTrue(allclose(res2, op(x, test)))
 
                 buffer.append(4)
                 test += 1
 
-                self.assertTrue(allclose(op(buffer, x), op(test, x)))
-                self.assertTrue(allclose(op(x, buffer), op(x, test)))
+                res1 = op(buffer, x)
+                self.assertIsInstance(res1, ndarray)
+                self.assertTrue(allclose(res1, op(test, x)))
+
+                res2 = op(x, buffer)
+                self.assertIsInstance(res2, ndarray)
+                self.assertTrue(allclose(res2, op(x, test)))
+            return f
+
+        def iop_testcase(op):
+            def f(self):
+                data = zeros(3, dtype=float)
+                data2 = zeros(3, dtype=float)
+
+                test1 = arange(1, 4, dtype=float)
+                test2 = arange(2, 5, dtype=float)
+
+                x = rand(3)
+
+                buffer1 = NumpyCircularBuffer(data)
+                buffer2 = NumpyCircularBuffer(data2)
+
+                buffer1.append(1)
+                buffer1.append(2)
+                buffer1.append(3)
+
+                buffer2.append(1)
+                buffer2.append(2)
+                buffer2.append(3)
+
+                op(buffer1, x)
+                op(test1, x)
+                self.assertIsInstance(buffer1, NumpyCircularBuffer)
+                self.assertTrue(array_equal(buffer1, test1))
+
+                buffer2.append(4)
+
+                op(buffer2, x)
+                op(test2, x)
+                self.assertIsInstance(buffer2, NumpyCircularBuffer)
+                self.assertTrue(array_equal(buffer2 + 0, test2))
+
+            return f
+
+        def bitiop_testcase(op):
+            def f(self):
+                data = zeros(3, dtype=int)
+                data2 = zeros(3, dtype=int)
+
+                test1 = arange(1, 4, dtype=int)
+                test2 = arange(2, 5, dtype=int)
+
+                x = randint(low=1, high=100, size=3)
+
+                buffer1 = NumpyCircularBuffer(data)
+                buffer2 = NumpyCircularBuffer(data2)
+
+                buffer1.append(1)
+                buffer1.append(2)
+                buffer1.append(3)
+
+                buffer2.append(1)
+                buffer2.append(2)
+                buffer2.append(3)
+
+                op(buffer1, x)
+                op(test1, x)
+                self.assertIsInstance(buffer1, NumpyCircularBuffer)
+                self.assertTrue(allclose(buffer1, test1))
+
+                buffer2.append(4)
+
+                op(buffer2, x)
+                op(test2, x)
+                self.assertIsInstance(buffer2, NumpyCircularBuffer)
+                self.assertTrue(allclose(buffer2 + 0, test2))
+
             return f
 
         for op in bin_operators:
@@ -164,6 +267,12 @@ class OperatorTestFactory(type):
 
         for op in un_operators:
             setattr(obj, 'test_{}'.format(op.__name__), unop_testcase(op))
+
+        for op in i_operators:
+            setattr(obj, 'test_{}'.format(op.__name__), iop_testcase(op))
+
+        for op in bit_ioperators:
+            setattr(obj, 'test_{}'.format(op.__name__), bitiop_testcase(op))
 
         return(obj)
 
@@ -260,12 +369,25 @@ class TestNumpyCircularBuffer(
         buffer.append(1)
         buffer.append(2)
 
-        self.assertTrue(array_equal(buffer @ A, arange(3) @ A))
-        self.assertTrue(allclose(buffer @ B, arange(3) @ B))
+        res_a = buffer @ A
+        res_b = buffer @ B
+
+        self.assertIsInstance(res_a, ndarray)
+        self.assertIsInstance(res_b, ndarray)
+
+        self.assertTrue(array_equal(res_a, arange(3) @ A))
+        self.assertTrue(allclose(res_b, arange(3) @ B))
 
         buffer.append(3)
-        self.assertTrue(allclose(buffer @ A, arange(1, 4) @ A))
-        self.assertTrue(allclose(buffer @ B, arange(1, 4) @ B))
+
+        res_a = buffer @ A
+        res_b = buffer @ B
+
+        self.assertIsInstance(res_a, ndarray)
+        self.assertIsInstance(res_b, ndarray)
+
+        self.assertTrue(allclose(res_a, arange(1, 4) @ A))
+        self.assertTrue(allclose(res_b, arange(1, 4) @ B))
 
     def test_matmul_2d2d(self):
         """Tests buffer @ X where buffer.ndim == 2"""
@@ -285,14 +407,26 @@ class TestNumpyCircularBuffer(
 
         self.assertTrue(array_equal(buffer, test))
 
-        self.assertTrue(array_equal(buffer @ A, test @ A))
-        self.assertTrue(allclose(buffer @ B, test @ B))
+        res_a = buffer @ A
+        res_b = buffer @ B
+
+        self.assertIsInstance(res_a, ndarray)
+        self.assertIsInstance(res_b, ndarray)
+
+        self.assertTrue(array_equal(res_a, test @ A))
+        self.assertTrue(allclose(res_b, test @ B))
 
         buffer.append(arange(9, 12))
         test += 3
 
-        self.assertTrue(array_equal(buffer @ A, test @ A))
-        self.assertTrue(allclose(buffer @ B, test @ B))
+        res_a = buffer @ A
+        res_b = buffer @ B
+
+        self.assertIsInstance(res_a, ndarray)
+        self.assertIsInstance(res_b, ndarray)
+
+        self.assertTrue(array_equal(res_a, test @ A))
+        self.assertTrue(allclose(res_b, test @ B))
 
     def test_matmul_ndnd(self):
         """Tests buffer @ X where X.ndim > 2 and buffer.ndim > 2"""
@@ -311,15 +445,29 @@ class TestNumpyCircularBuffer(
 
         test = arange(27).reshape(3, 3, 3)
 
-        self.assertTrue(array_equal(buffer @ A, test @ A))
-        self.assertTrue(allclose(buffer @ B, test @ B))
+        res_a = buffer @ A
+        res_b = buffer @ B
+
+        self.assertIsInstance(res_a, ndarray)
+        self.assertIsInstance(res_b, ndarray)
+
+        self.assertTrue(array_equal(res_a, test @ A))
+        self.assertTrue(allclose(res_b, test @ B))
 
         buffer.append(filler + 27)
         test += 9
 
-        self.assertTrue(array_equal(buffer @ A, test @ A))
-        self.assertTrue(allclose(buffer @ B, test @ B))
-        self.assertTrue(allclose(buffer @ C, test @ C))
+        res_a = buffer @ A
+        res_b = buffer @ B
+        res_c = buffer @ C
+
+        self.assertIsInstance(res_a, ndarray)
+        self.assertIsInstance(res_b, ndarray)
+        self.assertIsInstance(res_c, ndarray)
+
+        self.assertTrue(array_equal(res_a, test @ A))
+        self.assertTrue(allclose(res_b, test @ B))
+        self.assertTrue(allclose(res_c, test @ C))
 
     def test_rmatmul_1d1d(self):
         """Tests X @ buffer where X.ndim == 1 and buffer.ndim == 1"""
@@ -328,32 +476,59 @@ class TestNumpyCircularBuffer(
         C = rand(3)
 
         buffer = NumpyCircularBuffer(data)
+
         buffer.append(0)
-        self.assertTrue(allclose(C[:1] @ buffer, C[:1] @ arange(1)))
+
+        res_c = C[:1] @ buffer
+        self.assertIsInstance(res_c, ndarray)
+        self.assertTrue(allclose(res_c, C[:1] @ arange(1)))
 
         buffer.append(1)
-        self.assertTrue(allclose(C[:2] @ buffer, C[:2] @ arange(2)))
+
+        res_c = C[:2] @ buffer
+        self.assertIsInstance(res_c, ndarray)
+        self.assertTrue(allclose(res_c, C[:2] @ arange(2)))
 
         buffer.append(2)
-        self.assertTrue(allclose(C @ buffer, C @ arange(3)))
+
+        res_c = C @ buffer
+        self.assertIsInstance(res_c, ndarray)
+        self.assertTrue(allclose(res_c, C @ arange(3)))
 
         buffer.append(3)
-        self.assertTrue(allclose(C @ buffer, C @ arange(1, 4)))
+
+        res_c = C @ buffer
+        self.assertIsInstance(res_c, ndarray)
+        self.assertTrue(allclose(res_c, C @ arange(1, 4)))
 
         buffer.append(4)
-        self.assertTrue(allclose(C @ buffer, C @ arange(2, 5)))
+
+        res_c = C @ buffer
+        self.assertIsInstance(res_c, ndarray)
+        self.assertTrue(allclose(res_c, C @ arange(2, 5)))
 
         buffer.append(5)
-        self.assertTrue(allclose(C @ buffer, C @ arange(3, 6)))
+
+        res_c = C @ buffer
+        self.assertIsInstance(res_c, ndarray)
+        self.assertTrue(allclose(res_c, C @ arange(3, 6)))
 
         buffer.append(6)
-        self.assertTrue(allclose(C @ buffer, C @ arange(4, 7)))
+        res_c = C @ buffer
+        self.assertIsInstance(res_c, ndarray)
+        self.assertTrue(allclose(res_c, C @ arange(4, 7)))
 
         buffer.pop()
-        self.assertTrue(allclose(C[1:] @ buffer, C[1:] @ arange(5, 7)))
+
+        res_c = C[1:] @ buffer
+        self.assertIsInstance(res_c, ndarray)
+        self.assertTrue(allclose(res_c, C[1:] @ arange(5, 7)))
 
         buffer.pop()
-        self.assertTrue(allclose(C[2:] @ buffer, C[2:] @ arange(6, 7)))
+
+        res_c = C[2:] @ buffer
+        self.assertIsInstance(res_c, ndarray)
+        self.assertTrue(allclose(res_c, C[2:] @ arange(6, 7)))
 
     def test_rmatmul_nd1d(self):
         """Tests X @ buffer where X.ndim == 1 and buffer.ndim > 1"""
@@ -369,22 +544,52 @@ class TestNumpyCircularBuffer(
         buffer.append(1)
         buffer.append(2)
 
+        res_a = A @ buffer
+
+        self.assertIsInstance(res_a, ndarray)
         self.assertTrue(array_equal(A @ buffer, A @ array([0, 1, 2])))
 
         buffer.append(3)
-        self.assertTrue(array_equal(A @ buffer, A @ array([1, 2, 3])))
-        self.assertTrue(allclose(B @ buffer, B @ array([1, 2, 3])))
-        self.assertTrue(allclose(C @ buffer, C @ array([1, 2, 3])))
+
+        res_a = A @ buffer
+        res_b = B @ buffer
+        res_c = C @ buffer
+
+        self.assertIsInstance(res_a, ndarray)
+        self.assertIsInstance(res_b, ndarray)
+        self.assertIsInstance(res_c, ndarray)
+
+        self.assertTrue(array_equal(res_a, A @ array([1, 2, 3])))
+        self.assertTrue(allclose(res_b, B @ array([1, 2, 3])))
+        self.assertTrue(allclose(res_c, C @ array([1, 2, 3])))
 
         buffer.append(4)
-        self.assertTrue(array_equal(A @ buffer, A @ arange(2, 5)))
-        self.assertTrue(allclose(B @ buffer, B @ arange(2, 5)))
-        self.assertTrue(allclose(C @ buffer, C @ arange(2, 5)))
+
+        res_a = A @ buffer
+        res_b = B @ buffer
+        res_c = C @ buffer
+
+        self.assertIsInstance(res_a, ndarray)
+        self.assertIsInstance(res_b, ndarray)
+        self.assertIsInstance(res_c, ndarray)
+
+        self.assertTrue(array_equal(res_a, A @ arange(2, 5)))
+        self.assertTrue(allclose(res_b, B @ arange(2, 5)))
+        self.assertTrue(allclose(res_c, C @ arange(2, 5)))
 
         buffer.append(5)
-        self.assertTrue(array_equal(A @ buffer, A @ arange(3, 6)))
-        self.assertTrue(allclose(B @ buffer, B @ arange(3, 6)))
-        self.assertTrue(allclose(C @ buffer, C @ arange(3, 6)))
+
+        res_a = A @ buffer
+        res_b = B @ buffer
+        res_c = C @ buffer
+
+        self.assertIsInstance(res_a, ndarray)
+        self.assertIsInstance(res_b, ndarray)
+        self.assertIsInstance(res_c, ndarray)
+
+        self.assertTrue(array_equal(res_a, A @ arange(3, 6)))
+        self.assertTrue(allclose(res_b, B @ arange(3, 6)))
+        self.assertTrue(allclose(res_c, C @ arange(3, 6)))
 
     def test_rmatmul_1dnd(self):
         """Tests X @ buffer where X.ndim == 1 and buffer.ndim > 1"""
@@ -407,32 +612,56 @@ class TestNumpyCircularBuffer(
         buffer2.append(arange(9, 18).reshape(3, 3))
         buffer2.append(arange(18, 27).reshape(3, 3))
 
-        self.assertTrue(allclose(A @ buffer1, A @ test1))
-        self.assertTrue(allclose(A @ buffer2, A @ test2))
+        res_buf1 = A @ buffer1
+        res_buf2 = A @ buffer2
+
+        self.assertIsInstance(res_buf1, ndarray)
+        self.assertIsInstance(res_buf2, ndarray)
+
+        self.assertTrue(allclose(res_buf1, A @ test1))
+        self.assertTrue(allclose(res_buf2, A @ test2))
 
         buffer1.append(arange(9, 12))
         buffer2.append(arange(27, 36).reshape(3, 3))
         test1 += 3
         test2 += 9
 
-        self.assertTrue(allclose(A @ buffer1, A @ test1))
-        self.assertTrue(allclose(A @ buffer2, A @ test2))
+        res_buf1 = A @ buffer1
+        res_buf2 = A @ buffer2
+
+        self.assertIsInstance(res_buf1, ndarray)
+        self.assertIsInstance(res_buf2, ndarray)
+
+        self.assertTrue(allclose(res_buf1, A @ test1))
+        self.assertTrue(allclose(res_buf2, A @ test2))
 
         buffer1.append(arange(12, 15))
         buffer2.append(arange(36, 45).reshape(3, 3))
         test1 += 3
         test2 += 9
 
-        self.assertTrue(allclose(A @ buffer1, A @ test1))
-        self.assertTrue(allclose(A @ buffer2, A @ test2))
+        res_buf1 = A @ buffer1
+        res_buf2 = A @ buffer2
+
+        self.assertIsInstance(res_buf1, ndarray)
+        self.assertIsInstance(res_buf2, ndarray)
+
+        self.assertTrue(allclose(res_buf1, A @ test1))
+        self.assertTrue(allclose(res_buf2, A @ test2))
 
         buffer1.append(arange(15, 18))
         buffer2.append(arange(45, 54).reshape(3, 3))
         test1 += 3
         test2 += 9
 
-        self.assertTrue(allclose(A @ buffer1, A @ test1))
-        self.assertTrue(allclose(A @ buffer2, A @ test2))
+        res_buf1 = A @ buffer1
+        res_buf2 = A @ buffer2
+
+        self.assertIsInstance(res_buf1, ndarray)
+        self.assertIsInstance(res_buf2, ndarray)
+
+        self.assertTrue(allclose(res_buf1, A @ test1))
+        self.assertTrue(allclose(res_buf2, A @ test2))
 
     def test_rmatmul_2d2d(self):
         data = zeros((3, 3))
@@ -451,16 +680,32 @@ class TestNumpyCircularBuffer(
 
         self.assertTrue(array_equal(buffer, test))
 
-        self.assertTrue(array_equal(A @ buffer, A @ test))
-        self.assertTrue(allclose(B @ buffer, B @ test))
-        self.assertTrue(allclose(C @ buffer, C @ test))
+        res_a = A @ buffer
+        res_b = B @ buffer
+        res_c = C @ buffer
+
+        self.assertIsInstance(res_a, ndarray)
+        self.assertIsInstance(res_b, ndarray)
+        self.assertIsInstance(res_c, ndarray)
+
+        self.assertTrue(array_equal(res_a, A @ test))
+        self.assertTrue(allclose(res_b, B @ test))
+        self.assertTrue(allclose(res_c, C @ test))
 
         buffer.append([9, 10, 11])
         test += 3
 
-        self.assertTrue(array_equal(A @ buffer, A @ test))
-        self.assertTrue(allclose(B @ buffer, B @ test))
-        self.assertTrue(allclose(C @ buffer, C @ test))
+        res_a = A @ buffer
+        res_b = B @ buffer
+        res_c = C @ buffer
+
+        self.assertIsInstance(res_a, ndarray)
+        self.assertIsInstance(res_b, ndarray)
+        self.assertIsInstance(res_c, ndarray)
+
+        self.assertTrue(array_equal(res_a, A @ test))
+        self.assertTrue(allclose(res_b, B @ test))
+        self.assertTrue(allclose(res_c, C @ test))
 
     def test_rmatmul_ndnd(self):
         data = zeros((3, 3, 3))
@@ -478,16 +723,32 @@ class TestNumpyCircularBuffer(
 
         test = arange(27).reshape(3, 3, 3)
 
-        self.assertTrue(array_equal(A @ buffer, A @ test))
-        self.assertTrue(allclose(B @ buffer, B @ test))
-        self.assertTrue(allclose(C @ buffer, C @ test))
+        res_a = A @ buffer
+        res_b = B @ buffer
+        res_c = C @ buffer
+
+        self.assertIsInstance(res_a, ndarray)
+        self.assertIsInstance(res_b, ndarray)
+        self.assertIsInstance(res_c, ndarray)
+
+        self.assertTrue(array_equal(res_a, A @ test))
+        self.assertTrue(allclose(res_b, B @ test))
+        self.assertTrue(allclose(res_c, C @ test))
 
         buffer.append(filler + 27)
         test += 9
 
-        self.assertTrue(array_equal(A @ buffer, A @ test))
-        self.assertTrue(allclose(B @ buffer, B @ test))
-        self.assertTrue(allclose(C @ buffer, C @ test))
+        res_a = A @ buffer
+        res_b = B @ buffer
+        res_c = C @ buffer
+
+        self.assertIsInstance(res_a, ndarray)
+        self.assertIsInstance(res_b, ndarray)
+        self.assertIsInstance(res_c, ndarray)
+
+        self.assertTrue(array_equal(res_a, A @ test))
+        self.assertTrue(allclose(res_b, B @ test))
+        self.assertTrue(allclose(res_c, C @ test))
 
     def test_forward_1d(self):
         data = zeros(3)
