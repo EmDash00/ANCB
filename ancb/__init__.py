@@ -1519,10 +1519,10 @@ class NumpyCircularBuffer(ndarray):
         else:
             self._size += 1
 
-    def pop_left(self):
+    def pop(self):
         """
         Gets the element at the start of the buffer and advances the start
-        of the buffer by one, consuming it.
+        of the buffer by one, consuming the element returned.
 
         Time complexity: O(1)
 

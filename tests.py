@@ -10,7 +10,7 @@ from numpy import array, zeros, arange
 from numpy.random import rand, randint
 from numpy import fill_diagonal
 
-from itertools import zip_longest, chain
+from itertools import zip_longest
 
 from operator import (
     matmul, add, sub, mul, truediv, mod, floordiv, pow,
@@ -108,7 +108,7 @@ class OperatorTestFactory(type):
                 buffer.append(-3)
                 test -= 1
 
-                self.assertTrue(array_equal(op(buffer), op(test)))  # fragmented
+                self.assertTrue(array_equal(op(buffer), op(test)))  # frag
 
             return f
 
@@ -204,13 +204,13 @@ class TestNumpyCircularBuffer(
         buffer.append(5)
         self.assertFalse(buffer.fragmented)
 
-        buffer.pop_left()
+        buffer.pop()
         self.assertFalse(buffer.fragmented)
 
-        buffer.pop_left()
+        buffer.pop()
         self.assertFalse(buffer.fragmented)
 
-        buffer.pop_left()
+        buffer.pop()
         self.assertFalse(buffer.fragmented)
 
     def test_matmul_1d1d(self):
@@ -241,10 +241,10 @@ class TestNumpyCircularBuffer(
         buffer.append(6)
         self.assertTrue(allclose(buffer @ C, (arange(4, 7)) @ C))
 
-        buffer.pop_left()
+        buffer.pop()
         self.assertTrue(allclose(buffer @ C[1:], (arange(5, 7)) @ C[1:]))
 
-        buffer.pop_left()
+        buffer.pop()
         self.assertTrue(allclose(buffer @ C[2:], (arange(6, 7)) @ C[2:]))
 
     def test_matmul_1d2d(self):
@@ -349,10 +349,10 @@ class TestNumpyCircularBuffer(
         buffer.append(6)
         self.assertTrue(allclose(C @ buffer, C @ arange(4, 7)))
 
-        buffer.pop_left()
+        buffer.pop()
         self.assertTrue(allclose(C[1:] @ buffer, C[1:] @ arange(5, 7)))
 
-        buffer.pop_left()
+        buffer.pop()
         self.assertTrue(allclose(C[2:] @ buffer, C[2:] @ arange(6, 7)))
 
     def test_rmatmul_nd1d(self):
@@ -509,9 +509,9 @@ class TestNumpyCircularBuffer(
 
         self.assertTrue(buffer.full)
 
-        self.assertEqual(buffer.pop_left(), data[0])
-        self.assertEqual(buffer.pop_left(), data[1])
-        self.assertEqual(buffer.pop_left(), data[2])
+        self.assertEqual(buffer.pop(), data[0])
+        self.assertEqual(buffer.pop(), data[1])
+        self.assertEqual(buffer.pop(), data[2])
 
         self.assertTrue(buffer.empty)
 
@@ -535,9 +535,9 @@ class TestNumpyCircularBuffer(
 
         self.assertTrue(buffer.full)
 
-        self.assertTrue(array_equal(buffer.pop_left(), data[0]))
-        self.assertTrue(array_equal(buffer.pop_left(), data[1]))
-        self.assertTrue(array_equal(buffer.pop_left(), data[2]))
+        self.assertTrue(array_equal(buffer.pop(), data[0]))
+        self.assertTrue(array_equal(buffer.pop(), data[1]))
+        self.assertTrue(array_equal(buffer.pop(), data[2]))
 
         self.assertTrue(buffer.empty)
 
