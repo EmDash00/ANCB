@@ -6,7 +6,7 @@ from ancb import (  # type: ignore
 )
 
 from numpy import array_equal, allclose
-from numpy import array, zeros, arange, ndarray
+from numpy import array, zeros, arange, ndarray, ones
 from numpy.random import rand, randint
 from numpy import fill_diagonal
 
@@ -801,6 +801,30 @@ class TestNumpyCircularBuffer(
         self.assertTrue(array_equal(buffer.pop(), data[2]))
 
         self.assertTrue(buffer.empty)
+
+    def test_peek(self):
+        data = zeros((3, 3, 3))
+
+        buffer = NumpyCircularBuffer(data)
+        self.assertRaises(ValueError, buffer.peek)
+
+        buffer.append(1)
+        self.assertTrue(array_equal(buffer.peek(), ones((3, 3))))
+
+        buffer.append(2)
+        self.assertTrue(array_equal(buffer.peek(), ones((3, 3))))
+
+        buffer.append(3)
+        self.assertTrue(array_equal(buffer.peek(), ones((3, 3))))
+
+        buffer.append(4)
+        self.assertTrue(array_equal(buffer.peek(), ones((3, 3)) * 2))
+
+        buffer.append(5)
+        self.assertTrue(array_equal(buffer.peek(), ones((3, 3)) * 3))
+
+        buffer.append(6)
+        self.assertTrue(array_equal(buffer.peek(), ones((3, 3)) * 4))
 
 
 def main():

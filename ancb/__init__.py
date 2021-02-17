@@ -149,7 +149,9 @@ class NumpyCircularBuffer(ndarray):
                     k = self._capacity - self._begin  # fragmentation index
 
                     matmul(self[self._begin:], x[..., :k, :], out)
-                    out += matmul(self[:self._end], x[..., k:, :]).view(ndarray)
+                    out += matmul(self[:self._end], x[..., k:, :]).view(
+                        ndarray
+                    )
                 else:
                     if self._begin < self._end:
                         part = self[self._begin:self._end]
@@ -360,7 +362,9 @@ class NumpyCircularBuffer(ndarray):
                     k = self._capacity - self._begin  # fragmentation index
 
                     matmul(x[..., :, :k], self[self._begin:], out)
-                    out += matmul(x[..., :, k:], self[:self._end]).view(ndarray)
+                    out += matmul(x[..., :, k:], self[:self._end]).view(
+                        ndarray
+                    )
                 else:
                     if self._begin < self._end:
                         part = self[self._begin:self._end]
@@ -389,7 +393,9 @@ class NumpyCircularBuffer(ndarray):
                     k = self._capacity - self._begin  # fragmentation index
 
                     matmul(x[..., :, :k], self[self._begin:], out)
-                    out += matmul(x[..., :, k:], self[:self._end]).view(ndarray)
+                    out += matmul(x[..., :, k:], self[:self._end]).view(
+                        ndarray
+                    )
 
                 else:
                     if self._begin < self._end:
@@ -1923,5 +1929,19 @@ class NumpyCircularBuffer(ndarray):
             self._size -= 1
 
             return (self[i])
+        else:
+            raise ValueError
+
+    def peek(self):
+        """
+        Gets the element at the start of the buffer without advancing the
+        start of the buffer.
+
+        Time complexity: O(1)
+
+        :returns: slice of n elements from the start of the buffer
+        """
+        if not self.empty:
+            return (self[self._begin])
         else:
             raise ValueError
