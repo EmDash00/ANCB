@@ -5,10 +5,10 @@ from ancb import (  # type: ignore
     star_can_broadcast, can_broadcast
 )
 
-from numpy import array_equal, allclose
-from numpy import array, zeros, arange, ndarray, ones
+from numpy import array_equal, allclose, shares_memory
+from numpy import array, zeros, arange, ndarray, ones, full
 from numpy.random import rand, randint
-from numpy import fill_diagonal
+from numpy import fill_diagonal, roll
 
 from itertools import zip_longest
 
@@ -213,7 +213,7 @@ class OperatorTestFactory(type):
                 op(buffer1, x)
                 op(test1, x)
                 self.assertIsInstance(buffer1, NumpyCircularBuffer)
-                self.assertTrue(array_equal(buffer1, test1))
+                self.assertTrue(array_equal(buffer1 + 0, test1))
 
                 buffer2.append(4)
 
@@ -248,7 +248,7 @@ class OperatorTestFactory(type):
                 op(buffer1, x)
                 op(test1, x)
                 self.assertIsInstance(buffer1, NumpyCircularBuffer)
-                self.assertTrue(allclose(buffer1, test1))
+                self.assertTrue(allclose(buffer1 + 0, test1))
 
                 buffer2.append(4)
 
@@ -825,6 +825,360 @@ class TestNumpyCircularBuffer(
 
         buffer.append(6)
         self.assertTrue(array_equal(buffer.peek(), ones((3, 3)) * 4))
+
+    def test_all(self):
+        data = zeros((3, 3, 3))
+        buffer = NumpyCircularBuffer(data)
+
+        buffer.append(1)
+        self.assertTrue(buffer.all())
+
+        buffer.append(1)
+        self.assertTrue(buffer.all())
+
+        buffer.append(0)
+        self.assertFalse(buffer.all())
+
+        buffer.append(1)
+        self.assertFalse(buffer.all())
+
+        buffer.append(1)
+        self.assertFalse(buffer.all())
+
+        buffer.append(2)
+        self.assertTrue(buffer.all())
+
+    def test_any(self):
+        data = zeros((3, 3, 3))
+        buffer = NumpyCircularBuffer(data)
+
+        buffer.append([0, 0, 1])
+        self.assertTrue(buffer.any())
+
+        buffer.append(0)
+        self.assertTrue(buffer.any())
+
+        buffer.append(0)
+        self.assertTrue(buffer.any())
+
+        buffer.append(0)
+        self.assertFalse(buffer.any())
+
+        buffer.append(0)
+        self.assertFalse(buffer.any())
+
+        buffer.append(2)
+        self.assertTrue(buffer.any())
+
+    def test_byteswap(self):
+        data = zeros(3)
+        test = zeros(3)
+        buffer = NumpyCircularBuffer(data)
+
+        r = randint(100)
+        buffer.append(r)
+        test[0] = r
+
+        r = randint(100)
+        buffer.append(r)
+        test[1] = r
+
+        r = randint(100)
+        buffer.append(r)
+        test[2] = r
+
+        res = buffer.byteswap()
+
+        self.assertTrue(array_equal(res, test.byteswap()))
+        self.assertIsInstance(res, ndarray)
+        self.assertIsNot(buffer, res)
+
+        r = randint(100)
+        buffer.append(r)
+        test[0] = r
+        test = roll(test, -1)
+        res = buffer.byteswap()
+
+        self.assertTrue(array_equal(res, test.byteswap()))
+        self.assertIsInstance(res, ndarray)
+        self.assertIsNot(buffer, res)
+
+        r = randint(100)
+        buffer.append(r)
+        test[0] = r
+        test = roll(test, -1)
+        res = buffer.byteswap()
+
+        self.assertTrue(array_equal(res, test.byteswap()))
+        self.assertIsInstance(res, ndarray)
+        self.assertIsNot(buffer, res)
+
+        r = randint(100)
+        buffer.append(r)
+        test[0] = r
+        test = roll(test, -1)
+        res = buffer.byteswap()
+
+        self.assertTrue(array_equal(res, test.byteswap()))
+        self.assertIsInstance(res, ndarray)
+        self.assertIsNot(buffer, res)
+
+        r = randint(100)
+        buffer.append(r)
+        res = buffer.byteswap()
+        inplace_res = buffer.byteswap(inplace=True)
+
+        self.assertTrue(array_equal(res, roll(inplace_res.view(ndarray), -1)))
+        self.assertTrue(shares_memory(inplace_res, buffer))
+        self.assertIsInstance(res, ndarray)
+        self.assertIsInstance(inplace_res, ndarray)
+
+    def test_clip(self):
+        data = zeros(3)
+        test = zeros(3)
+        buffer = NumpyCircularBuffer(data)
+
+        r = randint(100)
+        buffer.append(r)
+        test[0] = r
+
+        r = randint(100)
+        buffer.append(r)
+        test[1] = r
+
+        r = randint(100)
+        buffer.append(r)
+        test[2] = r
+
+        res = buffer.clip(1, 10)
+
+        self.assertTrue(array_equal(res, test.clip(1, 10)))
+        self.assertIsInstance(res, ndarray)
+
+        r = randint(100)
+        buffer.append(r)
+        test[0] = r
+        test = roll(test, -1)
+        res = buffer.clip(1, 10)
+
+        self.assertTrue(array_equal(res, test.clip(1, 10)))
+        self.assertIsInstance(res, ndarray)
+
+        r = randint(100)
+        buffer.append(r)
+        test[0] = r
+        test = roll(test, -1)
+        res = buffer.clip(1, 10)
+
+        self.assertTrue(array_equal(res, test.clip(1, 10)))
+        self.assertIsInstance(res, ndarray)
+
+        r = randint(100)
+        buffer.append(r)
+        test[0] = r
+        test = roll(test, -1)
+        res = buffer.clip(1, 10)
+
+        self.assertTrue(array_equal(res, test.clip(1, 10)))
+        self.assertIsInstance(res, ndarray)
+        self.assertIsNot(buffer, res)
+
+        r = randint(100)
+        buffer.append(r)
+        res = buffer.clip(1, 10)
+        inplace_res = buffer.clip(1, 10, out=buffer)
+
+        self.assertTrue(array_equal(res, roll(inplace_res.view(ndarray), -1)))
+        self.assertTrue(shares_memory(inplace_res.data, buffer.data))
+        self.assertIsInstance(res, ndarray)
+        self.assertIsInstance(inplace_res, ndarray)
+
+    def test_conj(self):
+        data = zeros(3, dtype=complex)
+        test = zeros(3, dtype=complex)
+        buffer = NumpyCircularBuffer(data)
+
+        r = rand()
+        buffer.append(r + r*1j)
+        test[0] = r + r*1j
+
+        r = rand()
+        buffer.append(r + r*1j)
+        test[1] = r + r*1j
+
+        r = rand()
+        buffer.append(r + r*1j)
+        test[2] = r + r*1j
+
+        res = buffer.conj()
+        self.assertTrue(array_equal(res, test.conj()))
+        self.assertIsInstance(res, ndarray)
+
+        r = rand()
+        buffer.append(r + r*1j)
+        test[0] = r + r*1j
+        test = roll(test, -1)
+
+        res = buffer.conj()
+        self.assertTrue(array_equal(res, test.conj()))
+        self.assertIsInstance(res, ndarray)
+
+        r = rand()
+        buffer.append(r + r*1j)
+        test[0] = r + r*1j
+        test = roll(test, -1)
+
+        res = buffer.conj()
+        self.assertTrue(array_equal(res, test.conj()))
+
+        r = rand()
+        buffer.append(r + r*1j)
+        test[0] = r + r*1j
+        test = roll(test, -1)
+
+        res = buffer.conj()
+        self.assertTrue(array_equal(res, test.conj()))
+
+    def test_copy(self):
+        data = zeros(3)
+        test = zeros(3)
+        buffer = NumpyCircularBuffer(data)
+
+        r = rand()
+        buffer.append(r)
+        test[0] = r
+
+        r = rand()
+        buffer.append(r)
+        test[1] = r
+
+        r = rand()
+        buffer.append(r)
+        test[2] = r
+
+        res = buffer.copy()
+
+        self.assertTrue(array_equal(res, test))
+        self.assertTrue(array_equal(res, buffer))
+        self.assertIsInstance(res, ndarray)
+        self.assertIsNot(buffer, res)
+        self.assertFalse(shares_memory(buffer, res))
+
+        r = rand()
+        buffer.append(r)
+        test[0] = r
+        res = buffer.copy()
+
+        self.assertTrue(array_equal(res, test))
+        self.assertIsInstance(res, ndarray)
+        self.assertIsNot(buffer, res)
+        self.assertFalse(shares_memory(buffer, res))
+
+    def test_fill(self):
+        data = zeros((3, 3, 3))
+        buffer = NumpyCircularBuffer(data)
+        test = zeros((3, 3, 3))
+
+        buffer.append(0)
+        buffer.fill(3)
+        test[:1].fill(3)
+
+        self.assertTrue(array_equal(test, buffer.view(ndarray)))
+
+        buffer.append(0)
+        buffer.fill(3)
+        test[:2].fill(3)
+
+        self.assertTrue(array_equal(test, buffer.view(ndarray)))
+
+        buffer.append(0)
+        buffer.fill(3)
+        test[:3].fill(3)
+
+        self.assertTrue(array_equal(test, buffer.view(ndarray)))
+
+        buffer.append(1)
+        buffer.fill(4)
+        test.fill(4)
+
+        self.assertTrue(array_equal(test, buffer.view(ndarray)))
+
+    def test_flatten(self):
+        data = zeros((3, 3, 3))
+        buffer = NumpyCircularBuffer(data)
+
+        buffer.append(arange(9).reshape(3, 3))
+        buffer.append(arange(9, 18).reshape(3, 3))
+        buffer.append(arange(18, 27).reshape(3, 3))
+
+        res = buffer.flatten()
+        self.assertTrue(array_equal(res, arange(27)))
+        self.assertFalse(shares_memory(res, buffer))
+
+        buffer.append(arange(27, 36).reshape(3, 3))
+
+        res = buffer.flatten()
+        self.assertTrue(array_equal(res, roll(arange(9, 36), 9)))
+        self.assertTrue(
+            array_equal(
+                buffer.flatten(defrag=True),
+                arange(9, 36)
+            )
+        )
+        self.assertFalse(shares_memory(res, buffer))
+
+    def test_round(self):
+        data = zeros(3)
+        test = zeros(3)
+        buffer = NumpyCircularBuffer(data)
+
+        r = rand() * 100
+        buffer.append(r)
+        test[0] = r
+
+        r = rand() * 100
+        buffer.append(r)
+        test[1] = r
+
+        r = rand() * 100
+        buffer.append(r)
+        test[2] = r
+
+        res = buffer.round(decimals=2)
+
+        self.assertTrue(array_equal(res, test.round(decimals=2)))
+        self.assertIsInstance(res, ndarray)
+        self.assertIsNot(buffer, res)
+
+        r = rand() * 100
+        buffer.append(r)
+        test[0] = r
+        test = roll(test, -1)
+        res = buffer.round(decimals=2)
+
+        self.assertTrue(array_equal(res, test.round(decimals=2)))
+        self.assertIsInstance(res, ndarray)
+        self.assertIsNot(buffer, res)
+
+        r = rand() * 100
+        buffer.append(r)
+        test[0] = r
+        test = roll(test, -1)
+        res = buffer.round(decimals=2)
+
+        self.assertTrue(array_equal(res, test.round(decimals=2)))
+        self.assertIsInstance(res, ndarray)
+        self.assertIsNot(buffer, res)
+
+        r = rand() * 100
+        buffer.append(r)
+        res = buffer.round(decimals=2, out=buffer)
+        inplace_res = buffer.round(decimals=2, out=buffer)
+
+        self.assertTrue(array_equal(res, inplace_res))
+        self.assertTrue(shares_memory(inplace_res, buffer))
+        self.assertIsInstance(res, ndarray)
+        self.assertIsInstance(inplace_res, ndarray)
 
 
 def main():

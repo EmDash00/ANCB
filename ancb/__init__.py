@@ -1,4 +1,4 @@
-from numpy import ndarray, asarray, empty  # type: ignore
+from numpy import ndarray, asarray, empty, empty_like  # type: ignore
 from typing import Tuple
 from typing import Union
 
@@ -10,6 +10,8 @@ from numpy import (
     negative, positive, absolute,
     right_shift, left_shift, bitwise_and, invert, bitwise_or, bitwise_xor
 )
+
+import numpy as np
 
 
 def can_broadcast(shape1, shape2) -> bool:
@@ -1939,9 +1941,389 @@ class NumpyCircularBuffer(ndarray):
 
         Time complexity: O(1)
 
-        :returns: slice of n elements from the start of the buffer
+        :returns: element at the start of the buffer
         """
         if not self.empty:
             return (self[self._begin])
         else:
             raise ValueError
+
+    def all(self, *args, **kwargs):
+        """
+        Returns True if all elements evaluate to True.
+
+        Time complexity: O(1)
+
+        :returns: True if all elements evaluate to True, False otherwise.
+        """
+        if self.fragmented:
+            return (
+                np.all(self[self._begin:].view(ndarray), *args, **kwargs) and
+                np.all(self[:self._end].view(ndarray), *args, **kwargs)
+            )
+        else:
+            if self._begin < self._end:
+                part = self[self._begin:self._end]
+            elif self._end == 0:
+                part = self[self._begin:]
+
+            return (np.all(part.view(ndarray), *args, **kwargs))
+
+    def any(self, *args, **kwargs):
+        """
+        Returns True if any elements evaluate to True.
+
+        Time complexity: O(1)
+
+        :returns: True if any elements evaluate to True, False otherwise.
+        """
+        if self.fragmented:
+            return (
+                np.any(self[self._begin:].view(ndarray), *args, **kwargs) and
+                np.any(self[:self._end].view(ndarray), *args, **kwargs)
+            )
+        else:
+            if self._begin < self._end:
+                part = self[self._begin:self._end]
+            elif self._end == 0:
+                part = self[self._begin:]
+
+            return (np.any(part.view(ndarray), *args, **kwargs))
+
+    def argmax(self, *args, **kwargs):
+        # TODO: Flagged for implementation
+        raise NotImplementedError
+
+    def argmin(self, *args, **kwargs):
+        # TODO: Flagged for implementation
+        raise NotImplementedError
+
+    def argpartition(self, *args, **kwargs):
+        raise NotImplementedError
+
+    def argsort(self, *args, **kwargs):
+        raise NotImplementedError
+
+    def astype(self, *args, **kwargs):
+        raise NotImplementedError
+
+    def byteswap(self, inplace=False):
+        if inplace:
+            if self.fragmented:
+                (self[self._begin:].view(ndarray)).byteswap(inplace)
+                (self[:self._end].view(ndarray)).byteswap(inplace)
+            else:
+                if self._begin < self._end:
+                    part = self[self._begin:self._end]
+                elif self._end == 0:
+                    part = self[self._begin:]
+
+                (part.view(ndarray)).byteswap(inplace)
+
+            return self.view(ndarray)
+        else:
+            out = empty_like(self)
+            if self.fragmented:
+                k = self._capacity - self._begin  # fragmentation index
+                out[:k] = (self[self._begin:].view(ndarray)).byteswap(inplace)
+                out[k:] = (self[:self._end].view(ndarray)).byteswap(inplace)
+            else:
+                if self._begin < self._end:
+                    part = self[self._begin:self._end]
+                elif self._end == 0:
+                    part = self[self._begin:]
+
+                out = (part.view(ndarray)).byteswap(inplace)
+
+            return (out)
+
+    def choose(self, choices, out=None, mode='raise'):
+        raise NotImplementedError
+
+    def clip(self, min=None, max=None, out=None, **kwargs):
+        if min is None and max is None:
+            raise ValueError("One of max or min must be given")
+        if out is None:
+            out = empty_like(self)
+
+        if self.fragmented:
+            k = self._capacity - self._begin  # fragmentation index
+            if out is self:
+                np.clip(
+                    min, max,
+                    self[self._begin:], self[self._begin:],
+                    **kwargs
+                )
+
+                np.clip(
+                    min, max,
+                    self[:self._end], self[:self._end],
+                    **kwargs
+                )
+            else:
+                np.clip(min, max, self[self._begin:], out[:k], **kwargs)
+                np.clip(min, max, self[:self._end], out[k:], **kwargs)
+
+            return(out.view(ndarray))
+        else:
+            if self._begin < self._end:
+                part = self[self._begin:self._end]
+            elif self._end == 0:
+                part = self[self._begin:]
+
+            np.clip(min, max, part, out, **kwargs)
+
+            return (out.view(ndarray))
+
+    def conj(self):
+        out = empty((self._size, *self.shape[1:]), self.dtype)
+
+        if self.fragmented:
+            k = self._capacity - self._begin  # fragmentation index
+            np.conjugate(self[self._begin:], out[:k])
+            np.conjugate(self[:self._end], out[k:])
+        else:
+            if self._begin < self._end:
+                part = self[self._begin:self._end]
+            elif self._end == 0:
+                part = self[self._begin:]
+
+            np.conjugate(part, out)
+
+        return(out.view(ndarray))
+
+    def conjugate(self):
+        out = empty((self._size, *self.shape[1:]), self.dtype)
+
+        if self.fragmented:
+            k = self._capacity - self._begin  # fragmentation index
+            np.conjugate(self[self._begin:], out[:k])
+            np.conjugate(self[:self._end], out[k:])
+        else:
+            if self._begin < self._end:
+                part = self[self._begin:self._end]
+            elif self._end == 0:
+                part = self[self._begin:]
+
+            np.conjugate(part, out)
+
+        return(out)
+
+    def copy(self, order='C', defrag=False):
+        out = empty((self._size, *self.shape[1:]), self.dtype, order)
+
+        if self.fragmented:
+            if defrag:
+                k = self._capacity - self._begin  # fragmentation index
+                np.copyto(out[:k], self[self._begin:], casting='no')
+                np.copyto(out[k:], self[:self._end], casting='no')
+            else:
+                np.copyto(out, self)
+        else:
+            if self._begin < self._end:
+                part = self[self._begin:self._end]
+            elif self._end == 0:
+                part = self[self._begin:]
+
+            np.copyto(out, part, casting='no')
+
+        return(out)
+
+    def cumprod(self, axis=None, dtype=None, out=None):
+        # TODO: Flagged for implementation
+        raise NotImplementedError
+
+    def cumsum(self, axis=None, dtype=None, out=None):
+        # TODO: Flagged for implementation
+        raise NotImplementedError
+
+    def diagonal(self, offset=0, axis1=0, axis2=1):
+        # TODO: Flagged for implementation
+        raise NotImplementedError
+
+    def dot(self, b, out=None):
+        raise NotImplementedError
+
+    def dump(self, b, out=None):
+        # TODO: Flagged for implementation
+        raise NotImplementedError
+
+    def dumps(self, b, out=None):
+        # TODO: Flagged for implementation
+        raise NotImplementedError
+
+    def fill(self, value):
+        if self.fragmented:
+            (self[self._begin:].view(ndarray)).fill(value)
+            (self[:self._end].view(ndarray)).fill(value)
+        else:
+            if self._begin < self._end:
+                part = self[self._begin:self._end]
+            elif self._end == 0:
+                part = self[self._begin:]
+
+            (part.view(ndarray)).fill(value)
+
+    def flatten(self, order='C', defrag=False):
+        if self.fragmented:
+            if defrag:
+                out = empty(self.size, self.dtype, order)
+
+                # fragmentation index
+                k = np.product(self.shape[1:]) * (self._capacity - self._begin)
+
+                out[:k] = (self[self._begin:].view(ndarray)).flat
+                out[k:] = (self[:self._end].view(ndarray)).flat
+            else:
+                out = (self.view(ndarray)).flatten()
+        else:
+            if self._begin < self._end:
+                part = self[self._begin:self._end]
+            elif self._end == 0:
+                part = self[self._begin:]
+
+            out = (part.view(ndarray)).flatten()
+        return (out)
+
+    def getfield(dtype, offset=0):
+        # TODO: Considered
+        raise NotImplementedError
+
+    def item(self, *args):
+        # TODO: Considered
+        raise NotImplementedError
+
+    def itemset(self, *args):
+        # TODO: Consider this for proper overloading
+        raise NotImplementedError
+
+    def max(self, axis=None, out=None, keepdims=False, initial=None,
+            where=True):
+        # TODO: Flagged for implementation
+        raise NotImplementedError
+
+    def min(self, axis=None, out=None, keepdims=False, initial=None,
+            where=True):
+        # TODO: Flagged for implementation
+        raise NotImplementedError
+
+    def newbyteorder(self, new_order='S'):
+        # TODO: Flagged for implementation
+        raise NotImplementedError
+
+    def nonzero(self):
+        # TODO: Flagged for implementation
+        raise NotImplementedError
+
+    def partition(kth, axis=-1, kind='introselect', order=None):
+        raise NotImplementedError
+
+    def prod(axis=None, dtype=None, out=None, keepdims=False, initial=1,
+             where=True):
+        # TODO: Flagged for implementation
+        raise NotImplementedError
+
+    def ptp(axis=None, out=None, keepdims=False):
+        # TODO: Flagged for implementation
+        raise NotImplementedError
+
+    def put(indices, values, mode='raise'):
+        raise NotImplementedError
+
+    def ravel(order):
+        # TODO: Flagged for implementation
+        raise NotImplementedError
+
+    def repeat(order):
+        # TODO: Flagged for implementation
+        raise NotImplementedError
+
+    def reshape(shape, order):
+        raise NotImplementedError
+
+    def resize(shape, order):
+        raise NotImplementedError
+
+    def round(self, decimals=0, out=None):
+        if out is None:
+            out = empty_like(
+                self, subok=False, shape=(self._size, *self.shape[1:])
+            )
+
+        if self.fragmented:
+            if out is self:
+                np.around(
+                    self[self._begin:].view(ndarray),
+                    decimals,
+                    self[self._begin:]
+                )
+                np.around(
+                    self[:self._end].view(ndarray),
+                    decimals,
+                    self[:self._end]
+                )
+            else:
+                k = self._capacity - self._begin  # fragmentation index
+
+                np.around(self[self._begin:].view(ndarray), decimals, out[:k])
+                np.around(self[:self._end].view(ndarray), decimals, out[k:])
+        else:
+            if self._begin < self._end:
+                part = self[self._begin:self._end]
+            elif self._end == 0:
+                part = self[self._begin:]
+
+            np.around(part.view(ndarray), decimals, out)
+
+        return(out)
+
+    def searchsorted(self, v, side='left', sorter=None):
+        raise NotImplementedError
+
+    def setfield(self, val, dtype, offset=0):
+        raise NotImplementedError
+
+    def sort(self, axis=-1, kind=None, order=None):
+        raise NotImplementedError
+
+    def squeeze(self, axis=-1):
+        raise NotImplementedError
+
+    def std(self, axis=-1):
+        # TODO: Flagged for implementation
+        raise NotImplementedError
+
+    def sum(self, axis=-1, dtype=None, out=None, keepdims=False, initial=0,
+            where=True):
+        # TODO: Flagged for implementation
+        raise NotImplementedError
+
+    def swapaxes(self, axis1, axis2):
+        raise NotImplementedError
+
+    def take(self, indices, axis=None, out=None, mode='raise'):
+        raise NotImplementedError
+
+    def tobytes(self, order='C'):
+        # TODO: Flagged for implementation
+        raise NotImplementedError
+
+    def tofile(self, fid, sep="", format="%s"):
+        # TODO: Flagged for implementation
+        raise NotImplementedError
+
+    def tolist(self):
+        # TODO: Flagged for implementation
+        raise NotImplementedError
+
+    def tostring(self, order='C'):
+        # TODO: Flagged for implementation
+        raise NotImplementedError
+
+    def transpose(self, *axes):
+        raise NotImplementedError
+
+    def var(self, axis=None, dtype=None, out=None, ddof=0, keepdims=False, *,
+            where=True):
+        # TODO: Flagged for implementation
+        raise NotImplementedError
