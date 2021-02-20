@@ -1,3 +1,11 @@
+"""
+.. module::ancb
+   :platform: Cross platform
+   :synopsis: Main ANCB project module
+
+.. moduleauthor:: Drason "Emmy" Chow <drasonchow.business@gmail.com>
+"""
+
 from numpy import ndarray, asarray, empty, empty_like  # type: ignore
 from typing import Tuple
 from typing import Union
