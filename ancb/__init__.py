@@ -26,11 +26,10 @@ def can_broadcast(shape1, shape2) -> bool:
     """
     Check if shapes shape1 and shape2 can be broadcast together.
 
-    :param Tuple arr1:
-    :param Tuple arr2:
+    :param Tuple shape1: first shape to parse
+    :param Tuple shape2: second shape to parse
 
-    :returns: True if arr1 and arr2 can be broadcast together, False
-    otherwise
+    :returns: True if arr1 and arr2 can be broadcast together, False otherwise
 
     :rtype: bool
     """
@@ -50,10 +49,9 @@ def star_can_broadcast(starexpr) -> bool:
     Check if shapes shape1 and shape2 can be broadcast together from a
     tuple of zip_longest(shape1, shape2, fillvalue=1) called the "starexpr"
 
-    :param Tuple starexpr:
+    :param Tuple starexpr: starexpr to parse
 
-    :returns: True if shape1 and shape 2can be broadcast together, False
-    otherwise
+    :returns: True if shape1 and shape 2can be broadcast together, False otherwise
 
     :rtype: bool
     """
