@@ -1,13 +1,5 @@
-"""
-.. module::ancb
-   :platform: Cross platform
-   :synopsis: Main ANCB project module
-
-.. moduleauthor:: Drason "Emmy" Chow <drasonchow.business@gmail.com>
-"""
-
 from numpy import ndarray, asarray, empty, empty_like  # type: ignore
-from typing import Tuple
+from typing import Tuple, NoReturn
 from typing import Union
 
 from functools import reduce
@@ -51,7 +43,8 @@ def star_can_broadcast(starexpr) -> bool:
 
     :param Tuple starexpr: starexpr to parse
 
-    :returns: True if shape1 and shape 2can be broadcast together, False otherwise
+    :returns:
+        True if shape1 and shape2 can be broadcast together, False otherwise
 
     :rtype: bool
     """
@@ -1871,6 +1864,10 @@ class NumpyCircularBuffer(ndarray):
 
         :returns: True if buffer is full, False otherwise.
         :rtype: bool
+
+        See Also
+        --------
+        :func:`NumpyCircularBuffer.empty`
         """
 
         return (self._size == self._capacity)
@@ -1884,6 +1881,10 @@ class NumpyCircularBuffer(ndarray):
 
         :returns: True if buffer is empty, False otherwise.
         :rtype: bool
+
+        See Also
+        --------
+        :func:`NumpyCircularBuffer.full`
         """
 
         return (self._size == 0)
@@ -1903,13 +1904,18 @@ class NumpyCircularBuffer(ndarray):
         self._end = 0
         self._size = 0
 
-    def append(self, value) -> None:
+    def append(self, value):
         """
         Append a value to the buffer on the right. If the buffer is full, the
         buffer will advance forward (wrapping around at the ends) and overwrite
         an element.
 
         Time complexity: O(1)
+
+        See Also
+        --------
+        :func:`NumpyCircularBuffer.pop`
+        :func:`NumpyCircularBuffer.peek`
         """
         self[self._end] = value
         self._end = (self._end + 1) % self._capacity
@@ -1927,7 +1933,13 @@ class NumpyCircularBuffer(ndarray):
 
         Time complexity: O(1)
 
+        :raises: :class:`ValueError` if buffer is empty
         :returns: element at the start of the buffer
+
+        See Also
+        --------
+        :func:`NumpyCircularBuffer.peek`
+        :func:`NumpyCircularBuffer.append`
         """
 
         if not self.empty:
@@ -1947,7 +1959,14 @@ class NumpyCircularBuffer(ndarray):
 
         Time complexity: O(1)
 
+        :raises: :class:`ValueError` if buffer is empty
         :returns: element at the start of the buffer
+
+        See Also
+        --------
+        :func:`NumpyCircularBuffer.pop`
+        :func:`NumpyCircularBuffer.append`
+
         """
         if not self.empty:
             return (self[self._begin])
@@ -1958,9 +1977,12 @@ class NumpyCircularBuffer(ndarray):
         """
         Returns True if all elements evaluate to True.
 
-        Time complexity: O(1)
-
         :returns: True if all elements evaluate to True, False otherwise.
+
+        See Also
+        --------
+        :func:`ndarray.all`
+
         """
         if self.fragmented:
             return (
@@ -1979,9 +2001,11 @@ class NumpyCircularBuffer(ndarray):
         """
         Returns True if any elements evaluate to True.
 
-        Time complexity: O(1)
-
         :returns: True if any elements evaluate to True, False otherwise.
+
+        See Also
+        --------
+        :func:`ndarray.any`
         """
         if self.fragmented:
             return (
@@ -1998,22 +2022,57 @@ class NumpyCircularBuffer(ndarray):
 
     def argmax(self, *args, **kwargs):
         # TODO: Flagged for implementation
+        """
+        :raises NotImplementedError:
+            This function will be implemented in the future
+        """
+
         raise NotImplementedError
 
     def argmin(self, *args, **kwargs):
         # TODO: Flagged for implementation
+        """
+        :raises NotImplementedError:
+            This function will be implemented in the future
+        """
+
         raise NotImplementedError
 
-    def argpartition(self, *args, **kwargs):
+    def argpartition(self, *args, **kwargs) -> NoReturn:
+        """
+        :raises NotImplementedError:
+            This function has no plan for implementation as of this version.
+        """
         raise NotImplementedError
 
-    def argsort(self, *args, **kwargs):
+    def argsort(self, *args, **kwargs) -> NoReturn:
+        """
+        :raises NotImplementedError:
+            This function has no plan for implementation as of this version.
+        """
         raise NotImplementedError
 
-    def astype(self, *args, **kwargs):
+    def astype(self, *args, **kwargs) -> NoReturn:
+        # TODO: Considered
+        """
+        :raises NotImplementedError:
+            This function is being considered for implementation in the future
+        """
         raise NotImplementedError
 
     def byteswap(self, inplace=False):
+        """
+        Swap the bytes of the array elements over the valid range of the buffer
+
+        Toggle between low-endian and big-endian data representation by
+        returning a byteswapped array, optionally swapped in-place. Arrays of
+        byte-strings are not swapped. The real and imaginary parts of a complex
+        number are swapped individually.
+
+        See Also
+        --------
+        :func:`ndarray.byteswap`
+        """
         if inplace:
             if self.fragmented:
                 (self[self._begin:].view(ndarray)).byteswap(inplace)
@@ -2044,9 +2103,22 @@ class NumpyCircularBuffer(ndarray):
             return (out)
 
     def choose(self, choices, out=None, mode='raise'):
+        # TODO: Considered
+        """
+        :raises NotImplementedError:
+            This function is being considered for implementation in the future
+        """
         raise NotImplementedError
 
     def clip(self, min=None, max=None, out=None, **kwargs):
+        """
+        Return an array whose values are limited to [min, max] over the valid
+        range of the buffer. One of max or min must be given.
+
+        See Also
+        --------
+        :func:`numpy.clip`
+        """
         if min is None and max is None:
             raise ValueError("One of max or min must be given")
         if out is None:
@@ -2082,6 +2154,13 @@ class NumpyCircularBuffer(ndarray):
             return (out.view(ndarray))
 
     def conj(self):
+        """
+        Complex-conjugate all elements over the valid range of the buffer.
+
+        See Also
+        --------
+        :func:`numpy.conjugate()`
+        """
         out = empty((self._size, *self.shape[1:]), self.dtype)
 
         if self.fragmented:
@@ -2099,6 +2178,14 @@ class NumpyCircularBuffer(ndarray):
         return(out.view(ndarray))
 
     def conjugate(self):
+        """
+        Complex-conjugate all elements over the valid range of the buffer.
+
+        See Also
+        --------
+        :func:`numpy.conjugate()`
+        """
+
         out = empty((self._size, *self.shape[1:]), self.dtype)
 
         if self.fragmented:
@@ -2116,6 +2203,13 @@ class NumpyCircularBuffer(ndarray):
         return(out)
 
     def copy(self, order='C', defrag=False):
+        """
+        Return a copy of the array over the valid range of the buffer.
+
+        See Also
+        --------
+        :func:`ndarray.copy`
+        """
         out = empty((self._size, *self.shape[1:]), self.dtype, order)
 
         if self.fragmented:
@@ -2135,30 +2229,64 @@ class NumpyCircularBuffer(ndarray):
 
         return(out)
 
-    def cumprod(self, axis=None, dtype=None, out=None):
+    def cumprod(self, axis=None, dtype=None, out=None) -> NoReturn:
         # TODO: Flagged for implementation
+        """
+        :raises NotImplementedError:
+            This function will be implemented in the future
+        """
         raise NotImplementedError
 
-    def cumsum(self, axis=None, dtype=None, out=None):
+    def cumsum(self, axis=None, dtype=None, out=None) -> NoReturn:
         # TODO: Flagged for implementation
+        """
+        :raises NotImplementedError:
+            This function will be implemented in the future
+        """
         raise NotImplementedError
 
-    def diagonal(self, offset=0, axis1=0, axis2=1):
+    def diagonal(self, offset=0, axis1=0, axis2=1) -> NoReturn:
         # TODO: Flagged for implementation
+        """
+        :raises NotImplementedError:
+            This function will be implemented in the future
+        """
         raise NotImplementedError
 
-    def dot(self, b, out=None):
+    def dot(self, b, out=None) -> NoReturn:
+        # TODO: Flagged for implementation
+        """
+        :raises NotImplementedError:
+            This function will be implemented in the future
+        """
         raise NotImplementedError
 
-    def dump(self, b, out=None):
+    def dump(self, b, out=None) -> NoReturn:
         # TODO: Flagged for implementation
+        """
+        :raises NotImplementedError:
+            This function will be implemented in the future
+        """
         raise NotImplementedError
 
-    def dumps(self, b, out=None):
+    def dumps(self, b, out=None) -> NoReturn:  # type: ignore
         # TODO: Flagged for implementation
+        """
+        :raises NotImplementedError:
+            This function will be implemented in the future
+        """
         raise NotImplementedError
 
     def fill(self, value):
+        """
+        Fill the valid region of the buffer with a scalar value.
+
+        :param (scalar) value: All elements of *a* will be assigned this value.
+
+        See Also
+        --------
+        :func:`ndarray.fill`
+        """
         if self.fragmented:
             (self[self._begin:].view(ndarray)).fill(value)
             (self[:self._end].view(ndarray)).fill(value)
@@ -2171,6 +2299,13 @@ class NumpyCircularBuffer(ndarray):
             (part.view(ndarray)).fill(value)
 
     def flatten(self, order='C', defrag=False):
+        """
+        Return a copy of the array collapsed into one dimension.
+
+        See Also
+        --------
+        :func:`ndarray.flatten`
+        """
         if self.fragmented:
             if defrag:
                 out = empty(self.size, self.dtype, order)
@@ -2191,66 +2326,141 @@ class NumpyCircularBuffer(ndarray):
             out = (part.view(ndarray)).flatten()
         return (out)
 
-    def getfield(dtype, offset=0):
+    def getfield(dtype, offset=0) -> NoReturn:  # type: ignore
         # TODO: Considered
+        """
+        :raises NotImplementedError:
+            This function is being considered for implementation in the future
+        """
+
         raise NotImplementedError
 
-    def item(self, *args):
+    def item(self, *args) -> NoReturn:
         # TODO: Considered
+        """
+        :raises NotImplementedError:
+            This function is being considered for implementation in the future
+        """
+
         raise NotImplementedError
 
-    def itemset(self, *args):
+    def itemset(self, *args) -> NoReturn:
         # TODO: Consider this for proper overloading
+        """
+        :raises NotImplementedError:
+            This function will be implemented in the future
+        """
         raise NotImplementedError
 
     def max(self, axis=None, out=None, keepdims=False, initial=None,
-            where=True):
+            where=True) -> NoReturn:
         # TODO: Flagged for implementation
+        """
+        :raises NotImplementedError:
+            This function will be implemented in the future
+        """
         raise NotImplementedError
 
     def min(self, axis=None, out=None, keepdims=False, initial=None,
-            where=True):
+            where=True) -> NoReturn:
         # TODO: Flagged for implementation
+        """
+        :raises NotImplementedError:
+            This function will be implemented in the future
+        """
         raise NotImplementedError
 
-    def newbyteorder(self, new_order='S'):
+    def newbyteorder(self, new_order='S') -> NoReturn:
         # TODO: Flagged for implementation
+        """
+        :raises NotImplementedError:
+            This function will be implemented in the future
+        """
         raise NotImplementedError
 
-    def nonzero(self):
+    def nonzero(self) -> NoReturn:
         # TODO: Flagged for implementation
+        """
+        :raises NotImplementedError:
+            This function has no plan for implementation as of this version.
+        """
         raise NotImplementedError
 
-    def partition(kth, axis=-1, kind='introselect', order=None):
+    def partition(  # type: ignore
+        kth, axis=-1, kind='introselect', order=None
+    ) -> NoReturn:
+        """
+        :raises NotImplementedError:
+            This function has no plan for implementation as of this version.
+        """
         raise NotImplementedError
 
-    def prod(axis=None, dtype=None, out=None, keepdims=False, initial=1,
-             where=True):
+    def prod(  # type: ignore
+        axis=None,  # type: ignore
+        dtype=None, out=None, keepdims=False, initial=1, where=True
+    ) -> NoReturn:
         # TODO: Flagged for implementation
+        """
+        :raises NotImplementedError:
+            This function will be implemented in the future
+        """
         raise NotImplementedError
 
-    def ptp(axis=None, out=None, keepdims=False):
+    def ptp(axis=None, out=None, keepdims=False) -> NoReturn:  # type: ignore
         # TODO: Flagged for implementation
+        """
+        :raises NotImplementedError:
+            This function will be implemented in the future
+        """
         raise NotImplementedError
 
-    def put(indices, values, mode='raise'):
+    def put(indices, values, mode='raise') -> NoReturn:  # type: ignore
+        """
+        :raises NotImplementedError:
+            This function has no plan for implementation as of this version.
+        """
         raise NotImplementedError
 
-    def ravel(order):
+    def ravel(order) -> NoReturn:  # type: ignore
         # TODO: Flagged for implementation
+        """
+        :raises NotImplementedError:
+            This function will be implemented in the future
+        """
         raise NotImplementedError
 
-    def repeat(order):
+    def repeat(order) -> NoReturn:  # type: ignore
         # TODO: Flagged for implementation
+        """
+        :raises NotImplementedError:
+            This function will be implemented in the future
+        """
         raise NotImplementedError
 
-    def reshape(shape, order):
+    def reshape(shape, order) -> NoReturn:  # type: ignore
+        """
+        :raises NotImplementedError:
+            This function has no plan for implementation as of this version.
+        """
+
         raise NotImplementedError
 
-    def resize(shape, order):
+    def resize(shape, order) -> NoReturn:  # type: ignore
+        """
+        :raises NotImplementedError:
+            This function has no plan for implementation as of this version.
+        """
         raise NotImplementedError
 
     def round(self, decimals=0, out=None):
+        """
+        Return a copy of the valid region of the buffer with each element
+        rounded to the given number of decimals.
+
+        See Also
+        --------
+        :func:`numpy.around`
+        """
         if out is None:
             out = empty_like(
                 self, subok=False, shape=(self._size, *self.shape[1:])
@@ -2283,53 +2493,113 @@ class NumpyCircularBuffer(ndarray):
 
         return(out)
 
-    def searchsorted(self, v, side='left', sorter=None):
+    def searchsorted(self, v, side='left', sorter=None) -> NoReturn:
+        """
+        :raises NotImplementedError:
+            This function has no plan for implementation as of this version.
+        """
         raise NotImplementedError
 
-    def setfield(self, val, dtype, offset=0):
+    def setfield(self, val, dtype, offset=0) -> NoReturn:
+        """
+        :raises NotImplementedError:
+            This function has no plan for implementation as of this version.
+        """
         raise NotImplementedError
 
-    def sort(self, axis=-1, kind=None, order=None):
+    def sort(self, axis=-1, kind=None, order=None) -> NoReturn:
+        """
+        :raises NotImplementedError:
+            This function has no plan for implementation as of this version.
+        """
         raise NotImplementedError
 
-    def squeeze(self, axis=-1):
+    def squeeze(self, axis=-1) -> NoReturn:
+        # TODO:  Flagged for implementation
+        """
+        :raises NotImplementedError:
+            This function will be implemented in the future
+        """
         raise NotImplementedError
 
-    def std(self, axis=-1):
+    def std(self, axis=-1) -> NoReturn:  # type: ignore
         # TODO: Flagged for implementation
+        """
+        :raises NotImplementedError:
+            This function will be implemented in the future
+        """
         raise NotImplementedError
 
     def sum(self, axis=-1, dtype=None, out=None, keepdims=False, initial=0,
-            where=True):
+            where=True) -> NoReturn:
         # TODO: Flagged for implementation
+        """
+        :raises NotImplementedError:
+            This function will be implemented in the future
+        """
         raise NotImplementedError
 
-    def swapaxes(self, axis1, axis2):
+    def swapaxes(self, axis1, axis2) -> NoReturn:
+        # TODO: Considered
+        """
+        :raises NotImplementedError:
+            This function is being considered for implementation in the future
+        """
         raise NotImplementedError
 
-    def take(self, indices, axis=None, out=None, mode='raise'):
-        raise NotImplementedError
-
-    def tobytes(self, order='C'):
+    def take(self, indices, axis=None, out=None, mode='raise') -> NoReturn:
         # TODO: Flagged for implementation
+        """
+        :raises NotImplementedError:
+            This function will be implemented in the future
+        """
         raise NotImplementedError
 
-    def tofile(self, fid, sep="", format="%s"):
+    def tobytes(self, order='C') -> NoReturn:
         # TODO: Flagged for implementation
+        """
+        :raises NotImplementedError:
+            This function will be implemented in the future
+        """
+
         raise NotImplementedError
 
-    def tolist(self):
+    def tofile(self, fid, sep="", format="%s") -> NoReturn:
         # TODO: Flagged for implementation
+        """
+        :raises NotImplementedError:
+            This function will be implemented in the future
+        """
         raise NotImplementedError
 
-    def tostring(self, order='C'):
+    def tolist(self) -> NoReturn:
         # TODO: Flagged for implementation
+        """
+        :raises NotImplementedError:
+            This function will be implemented in the future
+        """
         raise NotImplementedError
 
-    def transpose(self, *axes):
+    def tostring(self, order='C') -> NoReturn:
+        # TODO: Flagged for implementation
+        """
+        :raises NotImplementedError:
+            This function will be implemented in the future
+        """
+        raise NotImplementedError
+
+    def transpose(self, *axes) -> NoReturn:
+        """
+        :raises NotImplementedError:
+            This function has no plan for implementation as of this version.
+        """
         raise NotImplementedError
 
     def var(self, axis=None, dtype=None, out=None, ddof=0, keepdims=False, *,
-            where=True):
+            where=True) -> NoReturn:
         # TODO: Flagged for implementation
+        """
+        :raises NotImplementedError:
+            This function will be implemented in the future
+        """
         raise NotImplementedError
