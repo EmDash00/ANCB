@@ -5,6 +5,8 @@ from typing import Union
 from functools import reduce
 from itertools import zip_longest, starmap
 
+import operator
+
 from numpy import (
     matmul, add, subtract, multiply, divide, mod, floor_divide, power,
     negative, positive, absolute,
@@ -17,11 +19,10 @@ import numpy as np
 def can_broadcast(shape1, shape2) -> bool:
     """
     Check if shapes shape1 and shape2 can be broadcast together.
+    shape1 and shape2 are tuples representing the shapes of two ndarrays.
 
     :param Tuple shape1: first shape to parse
     :param Tuple shape2: second shape to parse
-
-    :returns: True if arr1 and arr2 can be broadcast together, False otherwise
 
     :rtype: bool
     """
@@ -42,9 +43,6 @@ def star_can_broadcast(starexpr) -> bool:
     tuple of zip_longest(shape1, shape2, fillvalue=1) called the "starexpr"
 
     :param Tuple starexpr: starexpr to parse
-
-    :returns:
-        True if shape1 and shape2 can be broadcast together, False otherwise
 
     :rtype: bool
     """
@@ -269,20 +267,22 @@ class NumpyCircularBuffer(ndarray):
                     )
                 )
 
-    def matmul(self, x, temp):
+    def matmul(self, x, work_buffer):
         """
-        Performs buffer @ x.
+        Performs buffer @ x. For matmul, extra space will be needed to
+        perform the operation if buffer.fragmented is True and
+        buffer.ndim is 1.
 
         :param array_like x: Array to be multiplied by.
-        :param ndarray temp:
-            Extra preallocated space to be used. Must be the same size as the
-            output.
-
+        :param ndarray work_buffer:
+            Extra preallocated space to be used. It must be the same datatype
+            as the output. While the shape of the work_buffer not matter, it
+            must have space for at least as many elements as the output.
         :rtype: ndarray
         """
 
         x = asarray(x)
-        out2 = asarray(temp)
+        space = work_buffer.flat
 
         if (x.ndim == 0):
             ValueError(
@@ -319,7 +319,11 @@ class NumpyCircularBuffer(ndarray):
                 )
         elif self.ndim == 1 and x.ndim > 1:
             if self._size == x.shape[-2]:
-                out = empty(*x.shape[:-2], x.shape[-1])
+                out_shape = *x.shape[:-2], x.shape[-1]
+                out = empty(out_shape)
+                out2 = space[:reduce(operator.mul, out_shape)].reshape(
+                    out_shape
+                )
 
                 if self.fragmented:
                     k = self._capacity - self._begin  # fragmentation index
@@ -658,19 +662,25 @@ class NumpyCircularBuffer(ndarray):
                     )
                 )
 
-    def rmatmul(self, x, temp) -> ndarray:
+    def rmatmul(self, x, work_buffer) -> ndarray:
         """
-        Performs x @ buffer.
+        Performs x @ buffer. This operation requires extra space when
+        buffer.fragmented is True and either:
+            x.ndim == 1 and buffer.ndim > 1 or
+            x.ndim > 1 and buffer.ndim == 1 or
+            buffer.ndim == 2
 
         :param array_like x: Array to be multiplied by.
-        :param ndarray temp:
-            Extra preallocated space to be used. Must be the same size as the
-            output.
+        :param ndarray work_buffer:
+            Extra preallocated space to be used. It must be the same datatype
+            as the output. While the shape of the work_buffer not matter, it
+            must have space for at least as many elements as the output.
+
 
         :rtype: ndarray
         """
         x = asarray(x)
-        out2 = asarray(temp)
+        space = asarray(work_buffer).flat
 
         if (x.ndim == 0):
             ValueError(
@@ -709,6 +719,7 @@ class NumpyCircularBuffer(ndarray):
             if x.shape[0] == self.shape[-2]:
                 if self.ndim == 2:
                     out = empty(self.shape[-1])
+                    out2 = space[:self.shape[-1]]
 
                     if self.fragmented:
                         k = self._capacity - self._begin  # fragmentation index
@@ -755,6 +766,9 @@ class NumpyCircularBuffer(ndarray):
         elif x.ndim > 1 and self.ndim == 1:
             if x.shape[-1] == self.shape[0]:
                 out = empty(x.shape[:-1])
+                out2 = space[:reduce(operator.mul, x.shape[:-1])].reshape(
+                    x.shape[:-1]
+                )
                 if self.fragmented:
                     k = self._capacity - self._begin  # fragmentation index
 
@@ -780,8 +794,10 @@ class NumpyCircularBuffer(ndarray):
                 )
         elif self.ndim == 2:
             if (x.shape[-1] == self.shape[-2]):
-                out = empty(
-                    (*x.shape[:-1], self.shape[-2])
+                out_shape = (*x.shape[:-1], self.shape[-2])
+                out = empty(out_shape)
+                out2 = space[:reduce(operator.mul, out_shape)].reshape(
+                    out_shape
                 )
 
                 if self.fragmented:
