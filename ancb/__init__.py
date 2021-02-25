@@ -665,10 +665,10 @@ class NumpyCircularBuffer(ndarray):
     def rmatmul(self, x, work_buffer) -> ndarray:
         """
         Performs x @ buffer. This operation requires extra space when
-        buffer.fragmented is True and either:
-            x.ndim == 1 and buffer.ndim > 1 or
-            x.ndim > 1 and buffer.ndim == 1 or
-            buffer.ndim == 2
+        buffer.fragmented == True and either:
+            - x.ndim == 1 and buffer.ndim > 1 or
+            - x.ndim > 1 and buffer.ndim == 1 or
+            - buffer.ndim == 2
 
         :param array_like x: Array to be multiplied by.
         :param ndarray work_buffer:
