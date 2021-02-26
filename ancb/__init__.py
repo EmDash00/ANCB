@@ -270,8 +270,9 @@ class NumpyCircularBuffer(ndarray):
     def matmul(self, x, work_buffer):
         """
         Performs buffer @ x. For matmul, extra space will be needed to
-        perform the operation if buffer.fragmented is True and
-        buffer.ndim is 1.
+        perform the operation if
+
+        buffer.fragmented == True and buffer.ndim == 1
 
         :param array_like x: Array to be multiplied by.
         :param ndarray work_buffer:
