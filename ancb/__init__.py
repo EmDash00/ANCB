@@ -2871,9 +2871,14 @@ class NumpyCircularBuffer(ndarray):
         :func:`numpy.around`
         """
         if out is None:
-            out = empty_like(
-                self, subok=False, shape=(self._size, *self.shape[1:])
-            )
+            if self.flags['C_CONTIGUOUS']:
+                out = empty(
+                    (self._size, *self.shape[1:]), dtype=self.dtype, order='C'
+                )
+            else:
+                out = empty(
+                    (self._size, *self.shape[1:]), dtype=self.dtype, order='F'
+                )
 
         if self.fragmented:
             if out is self:
