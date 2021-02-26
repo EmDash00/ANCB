@@ -1419,6 +1419,7 @@ class TestNumpyCircularBuffer(
 
         res = buffer.clip(1, 10)
 
+        self.assertTrue(array_equal(buffer, test))
         self.assertTrue(allclose(res, test.clip(1, 10)))
         self.assertIsInstance(res, ndarray)
 
