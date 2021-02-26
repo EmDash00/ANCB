@@ -1401,8 +1401,8 @@ class TestNumpyCircularBuffer(
         self.assertIsInstance(inplace_res, ndarray)
 
     def test_clip(self):
-        data = zeros(3)
-        test = zeros(3)
+        data = zeros(3, dtype=int)
+        test = zeros(3, dtype=int)
         buffer = NumpyCircularBuffer(data)
 
         r = randint(100)
