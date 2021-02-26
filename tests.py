@@ -6,7 +6,7 @@ from ancb import (  # type: ignore
 )
 
 from numpy import array_equal, allclose, shares_memory
-from numpy import array, zeros, arange, ndarray, ones, full
+from numpy import array, zeros, arange, ndarray, ones, empty
 from numpy.random import rand, randint
 from numpy import fill_diagonal, roll
 
@@ -741,6 +741,473 @@ class TestNumpyCircularBuffer(
         res_a = A @ buffer
         res_b = B @ buffer
         res_c = C @ buffer
+
+        self.assertIsInstance(res_a, ndarray)
+        self.assertIsInstance(res_b, ndarray)
+        self.assertIsInstance(res_c, ndarray)
+
+        self.assertTrue(array_equal(res_a, A @ test))
+        self.assertTrue(allclose(res_b, B @ test))
+        self.assertTrue(allclose(res_c, C @ test))
+
+    def test_matmul2_1d1d(self):
+        """Tests buffer @ X where buffer.ndim == 1 and X.ndim == 1"""
+
+        data = zeros(3)
+        C = rand(3)
+
+        buffer = NumpyCircularBuffer(data)
+        buffer.append(0)
+        self.assertTrue(allclose(
+                buffer.matmul(C[:1], empty(1)), arange(1) @ C[:1]
+            )
+        )
+
+        buffer.append(1)
+        self.assertTrue(allclose(
+                buffer.matmul(C[:2], empty(2)), arange(2) @ C[:2]
+            )
+        )
+
+        buffer.append(2)
+        self.assertTrue(allclose(
+                buffer.matmul(C, empty(3)), arange(3) @ C
+            )
+        )
+
+        buffer.append(3)
+        self.assertTrue(allclose(
+                buffer.matmul(C, empty(3)), arange(1, 4) @ C
+            )
+        )
+
+        buffer.append(4)
+        self.assertTrue(allclose(
+                buffer.matmul(C, empty(3)), arange(2, 5) @ C
+            )
+        )
+
+        buffer.append(5)
+        self.assertTrue(allclose(
+                buffer.matmul(C, empty(3)), arange(3, 6) @ C
+            )
+        )
+
+        buffer.append(6)
+        self.assertTrue(allclose(
+                buffer.matmul(C, empty(3)), arange(4, 7) @ C
+            )
+        )
+
+        buffer.pop()
+        self.assertTrue(allclose(
+                buffer.matmul(C[1:], empty(2)), arange(5, 7) @ C[1:]
+            )
+        )
+
+        buffer.pop()
+        self.assertTrue(allclose(
+                buffer.matmul(C[2:], empty(1)), arange(6, 7) @ C[2:]
+            )
+        )
+
+    def test_matmul2_1d2d(self):
+        """Tests buffer @ X where buffer.ndim == 1 and X.ndim == 2"""
+
+        data = zeros(3)
+        A = zeros((3, 3))
+        B = rand(9).reshape(3, 3)
+        fill_diagonal(A, [1, 2, 3])
+
+        buffer = NumpyCircularBuffer(data)
+        buffer.append(0)
+        buffer.append(1)
+        buffer.append(2)
+
+        res_a = buffer.matmul(A, empty(3))
+        res_b = buffer.matmul(B, empty(3))
+
+        self.assertIsInstance(res_a, ndarray)
+        self.assertIsInstance(res_b, ndarray)
+
+        self.assertTrue(array_equal(res_a, arange(3) @ A))
+        self.assertTrue(allclose(res_b, arange(3) @ B))
+
+        buffer.append(3)
+
+        res_a = buffer.matmul(A, empty(3))
+        res_b = buffer.matmul(B, empty(3))
+
+        self.assertIsInstance(res_a, ndarray)
+        self.assertIsInstance(res_b, ndarray)
+
+        self.assertTrue(allclose(res_a, arange(1, 4) @ A))
+        self.assertTrue(allclose(res_b, arange(1, 4) @ B))
+
+    def test_matmul2_2d2d(self):
+        """Tests buffer @ X where buffer.ndim == 2"""
+
+        data = zeros((3, 3))
+        A = zeros(9).reshape(3, 3)
+        B = rand(9).reshape(3, 3)
+
+        fill_diagonal(A, arange(1, 4))
+        buffer = NumpyCircularBuffer(data)
+
+        buffer.append(arange(3))
+        buffer.append(arange(3, 6))
+        buffer.append(arange(6, 9))
+
+        test = arange(9).reshape(3, 3)
+
+        self.assertTrue(array_equal(buffer, test))
+
+        res_a = buffer.matmul(A, empty((3, 3)))
+        res_b = buffer.matmul(B, empty((3, 3)))
+
+        self.assertIsInstance(res_a, ndarray)
+        self.assertIsInstance(res_b, ndarray)
+
+        self.assertTrue(array_equal(res_a, test @ A))
+        self.assertTrue(allclose(res_b, test @ B))
+
+        buffer.append(arange(9, 12))
+        test += 3
+
+        res_a = buffer.matmul(A, empty((3, 3)))
+        res_b = buffer.matmul(B, empty((3, 3)))
+
+        self.assertIsInstance(res_a, ndarray)
+        self.assertIsInstance(res_b, ndarray)
+
+        self.assertTrue(array_equal(res_a, test @ A))
+        self.assertTrue(allclose(res_b, test @ B))
+
+    def test_matmul2_ndnd(self):
+        """Tests buffer @ X where X.ndim > 2 and buffer.ndim > 2"""
+        data = zeros((3, 3, 3))
+        A = zeros((3, 3, 3))
+        B = rand(27).reshape(3, 3, 3)
+        C = rand(12).reshape(3, 4)
+
+        fill_diagonal(A, [1, 2, 3])
+        buffer = NumpyCircularBuffer(data)
+        filler = arange(9).reshape(3, 3)
+
+        buffer.append(filler)
+        buffer.append(filler + 9)
+        buffer.append(filler + 18)
+
+        test = arange(27).reshape(3, 3, 3)
+
+        res_a = buffer.matmul(A, empty((3, 3, 3)))
+        res_b = buffer.matmul(B, empty((3, 3, 3)))
+        res_c = buffer.matmul(C, empty((3, 3, 4)))
+
+        self.assertIsInstance(res_a, ndarray)
+        self.assertIsInstance(res_b, ndarray)
+
+        self.assertTrue(array_equal(res_a, test @ A))
+        self.assertTrue(allclose(res_b, test @ B))
+
+        buffer.append(filler + 27)
+        test += 9
+
+        res_a = buffer.matmul(A, empty((3, 3, 3)))
+        res_b = buffer.matmul(B, empty((3, 3, 3)))
+        res_c = buffer.matmul(C, empty((3, 3, 4)))
+
+        self.assertIsInstance(res_a, ndarray)
+        self.assertIsInstance(res_b, ndarray)
+        self.assertIsInstance(res_c, ndarray)
+
+        self.assertTrue(array_equal(res_a, test @ A))
+        self.assertTrue(allclose(res_b, test @ B))
+        self.assertTrue(allclose(res_c, test @ C))
+
+    def test_rmatmul2_1d1d(self):
+        """Tests X @ buffer where X.ndim == 1 and buffer.ndim == 1"""
+
+        data = zeros(3)
+        C = rand(3)
+
+        buffer = NumpyCircularBuffer(data)
+
+        buffer.append(0)
+
+        res_c = buffer.rmatmul(C[:1], empty(1))
+
+        self.assertIsInstance(res_c, ndarray)
+        self.assertTrue(allclose(res_c, C[:1] @ arange(1)))
+
+        buffer.append(1)
+
+        res_c = buffer.rmatmul(C[:2], empty(1))
+
+        self.assertIsInstance(res_c, ndarray)
+        self.assertTrue(allclose(res_c, C[:2] @ arange(2)))
+
+        buffer.append(2)
+
+        res_c = buffer.rmatmul(C, empty(1))
+
+        self.assertIsInstance(res_c, ndarray)
+        self.assertTrue(allclose(res_c, C @ arange(3)))
+
+        buffer.append(3)
+
+        res_c = buffer.rmatmul(C, empty(1))
+
+        self.assertIsInstance(res_c, ndarray)
+        self.assertTrue(allclose(res_c, C @ arange(1, 4)))
+
+        buffer.append(4)
+
+        res_c = buffer.rmatmul(C, empty(1))
+
+        self.assertIsInstance(res_c, ndarray)
+        self.assertTrue(allclose(res_c, C @ arange(2, 5)))
+
+        buffer.append(5)
+
+        res_c = buffer.rmatmul(C, empty(1))
+
+        self.assertIsInstance(res_c, ndarray)
+        self.assertTrue(allclose(res_c, C @ arange(3, 6)))
+
+        buffer.append(6)
+
+        res_c = buffer.rmatmul(C, empty(1))
+
+        self.assertIsInstance(res_c, ndarray)
+        self.assertTrue(allclose(res_c, C @ arange(4, 7)))
+
+        buffer.pop()
+
+        res_c = buffer.rmatmul(C[1:], empty(1))
+
+        self.assertIsInstance(res_c, ndarray)
+        self.assertTrue(allclose(res_c, C[1:] @ arange(5, 7)))
+
+        buffer.pop()
+
+        res_c = buffer.rmatmul(C[2:], empty(1))
+
+        self.assertIsInstance(res_c, ndarray)
+        self.assertTrue(allclose(res_c, C[2:] @ arange(6, 7)))
+
+    def test_rmatmul2_nd1d(self):
+        """Tests X @ buffer where X.ndim == 1 and buffer.ndim > 1"""
+
+        data = zeros(3)
+        A = zeros(9).reshape(3, 3)
+        B = arange(9).reshape(3, 3)
+        C = arange(3)
+        fill_diagonal(A, [1, 2, 3])
+
+        buffer = NumpyCircularBuffer(data)
+        buffer.append(0)
+        buffer.append(1)
+        buffer.append(2)
+
+        res_a = A @ buffer
+        buffer.rmatmul(A, empty(3))
+
+        self.assertIsInstance(res_a, ndarray)
+        self.assertTrue(array_equal(A @ buffer, A @ array([0, 1, 2])))
+
+        buffer.append(3)
+
+        res_a = buffer.rmatmul(A, empty(3))
+        res_b = buffer.rmatmul(B, empty(3))
+        res_c = buffer.rmatmul(C, empty(3))
+
+        self.assertIsInstance(res_a, ndarray)
+        self.assertIsInstance(res_b, ndarray)
+        self.assertIsInstance(res_c, ndarray)
+
+        self.assertTrue(array_equal(res_a, A @ array([1, 2, 3])))
+        self.assertTrue(allclose(res_b, B @ array([1, 2, 3])))
+        self.assertTrue(allclose(res_c, C @ array([1, 2, 3])))
+
+        buffer.append(4)
+
+        res_a = buffer.rmatmul(A, empty(3))
+        res_b = buffer.rmatmul(B, empty(3))
+        res_c = buffer.rmatmul(C, empty(3))
+
+        self.assertIsInstance(res_a, ndarray)
+        self.assertIsInstance(res_b, ndarray)
+        self.assertIsInstance(res_c, ndarray)
+
+        self.assertTrue(array_equal(res_a, A @ arange(2, 5)))
+        self.assertTrue(allclose(res_b, B @ arange(2, 5)))
+        self.assertTrue(allclose(res_c, C @ arange(2, 5)))
+
+        buffer.append(5)
+
+        res_a = buffer.rmatmul(A, empty(3))
+        res_b = buffer.rmatmul(B, empty(3))
+        res_c = buffer.rmatmul(C, empty(3))
+
+        self.assertIsInstance(res_a, ndarray)
+        self.assertIsInstance(res_b, ndarray)
+        self.assertIsInstance(res_c, ndarray)
+
+        self.assertTrue(array_equal(res_a, A @ arange(3, 6)))
+        self.assertTrue(allclose(res_b, B @ arange(3, 6)))
+        self.assertTrue(allclose(res_c, C @ arange(3, 6)))
+
+    def test_rmatmul2_1dnd(self):
+        """Tests X @ buffer where X.ndim == 1 and buffer.ndim > 1"""
+
+        data1 = zeros((3, 3))
+        data2 = zeros((3, 3, 3))
+
+        A = rand(3)
+        test1 = arange(9).reshape(3, 3)
+        test2 = arange(27).reshape(3, 3, 3)
+
+        buffer1 = NumpyCircularBuffer(data1)
+        buffer2 = NumpyCircularBuffer(data2)
+
+        buffer1.append(arange(3))
+        buffer1.append(arange(3, 6))
+        buffer1.append(arange(6, 9))
+
+        buffer2.append(arange(9).reshape(3, 3))
+        buffer2.append(arange(9, 18).reshape(3, 3))
+        buffer2.append(arange(18, 27).reshape(3, 3))
+
+        res_buf1 = buffer1.rmatmul(A, empty(3))
+        res_buf2 = buffer2.rmatmul(A, empty((3, 3)))
+
+        self.assertIsInstance(res_buf1, ndarray)
+        self.assertIsInstance(res_buf2, ndarray)
+
+        self.assertTrue(allclose(res_buf1, A @ test1))
+        self.assertTrue(allclose(res_buf2, A @ test2))
+
+        buffer1.append(arange(9, 12))
+        buffer2.append(arange(27, 36).reshape(3, 3))
+        test1 += 3
+        test2 += 9
+
+        res_buf1 = buffer1.rmatmul(A, empty(3))
+        res_buf2 = buffer2.rmatmul(A, empty((3, 3)))
+
+        self.assertIsInstance(res_buf1, ndarray)
+        self.assertIsInstance(res_buf2, ndarray)
+
+        self.assertTrue(allclose(res_buf1, A @ test1))
+        self.assertTrue(allclose(res_buf2, A @ test2))
+
+        buffer1.append(arange(12, 15))
+        buffer2.append(arange(36, 45).reshape(3, 3))
+        test1 += 3
+        test2 += 9
+
+        res_buf1 = buffer1.rmatmul(A, empty(3))
+        res_buf2 = buffer2.rmatmul(A, empty((3, 3)))
+
+        self.assertIsInstance(res_buf1, ndarray)
+        self.assertIsInstance(res_buf2, ndarray)
+
+        self.assertTrue(allclose(res_buf1, A @ test1))
+        self.assertTrue(allclose(res_buf2, A @ test2))
+
+        buffer1.append(arange(15, 18))
+        buffer2.append(arange(45, 54).reshape((3, 3)))
+        test1 += 3
+        test2 += 9
+
+        res_buf1 = buffer1.rmatmul(A, empty(3))
+        res_buf2 = buffer2.rmatmul(A, empty((3, 3)))
+
+        self.assertIsInstance(res_buf1, ndarray)
+        self.assertIsInstance(res_buf2, ndarray)
+
+        self.assertTrue(allclose(res_buf1, A @ test1))
+        self.assertTrue(allclose(res_buf2, A @ test2))
+
+    def test_rmatmul2_2d2d(self):
+        data = zeros((3, 3))
+        A = zeros(9).reshape(3, 3)
+        B = rand(9).reshape(3, 3)
+        C = rand(12).reshape(4, 3)
+
+        fill_diagonal(A, arange(1, 4))
+        buffer = NumpyCircularBuffer(data)
+
+        buffer.append(arange(3))
+        buffer.append(arange(3, 6))
+        buffer.append(arange(6, 9))
+
+        test = arange(9).reshape(3, 3)
+
+        self.assertTrue(array_equal(buffer, test))
+
+        res_a = buffer.rmatmul(A, empty((3, 3)))
+        res_b = buffer.rmatmul(B, empty((3, 3)))
+        res_c = buffer.rmatmul(C, empty((4, 3)))
+
+        self.assertIsInstance(res_a, ndarray)
+        self.assertIsInstance(res_b, ndarray)
+        self.assertIsInstance(res_c, ndarray)
+
+        self.assertTrue(array_equal(res_a, A @ test))
+        self.assertTrue(allclose(res_b, B @ test))
+        self.assertTrue(allclose(res_c, C @ test))
+
+        buffer.append([9, 10, 11])
+        test += 3
+
+        res_a = buffer.rmatmul(A, empty((3, 3)))
+        res_b = buffer.rmatmul(B, empty((3, 3)))
+        res_c = buffer.rmatmul(C, empty((4, 3)))
+
+        self.assertIsInstance(res_a, ndarray)
+        self.assertIsInstance(res_b, ndarray)
+        self.assertIsInstance(res_c, ndarray)
+
+        self.assertTrue(array_equal(res_a, A @ test))
+        self.assertTrue(allclose(res_b, B @ test))
+        self.assertTrue(allclose(res_c, C @ test))
+
+    def test_rmatmul2_ndnd(self):
+        data = zeros((3, 3, 3))
+        A = zeros(27).reshape(3, 3, 3)
+        B = arange(27).reshape(3, 3, 3)
+        C = arange(3*8*3).reshape(3, 8, 3)
+
+        fill_diagonal(A, [1, 2, 3])
+        buffer = NumpyCircularBuffer(data)
+        filler = arange(9).reshape(3, 3)
+
+        buffer.append(filler)
+        buffer.append(filler + 9)
+        buffer.append(filler + 18)
+
+        test = arange(27).reshape(3, 3, 3)
+
+        res_a = buffer.rmatmul(A, empty((3, 3, 3)))
+        res_b = buffer.rmatmul(B, empty((3, 3, 3)))
+        res_c = buffer.rmatmul(C, empty((3, 8, 3)))
+
+        self.assertIsInstance(res_a, ndarray)
+        self.assertIsInstance(res_b, ndarray)
+        self.assertIsInstance(res_c, ndarray)
+
+        self.assertTrue(array_equal(res_a, A @ test))
+        self.assertTrue(allclose(res_b, B @ test))
+        self.assertTrue(allclose(res_c, C @ test))
+
+        buffer.append(filler + 27)
+        test += 9
+
+        res_a = buffer.rmatmul(A, empty((3, 3, 3)))
+        res_b = buffer.rmatmul(B, empty((3, 3, 3)))
+        res_c = buffer.rmatmul(C, empty((3, 8, 3)))
 
         self.assertIsInstance(res_a, ndarray)
         self.assertIsInstance(res_b, ndarray)
