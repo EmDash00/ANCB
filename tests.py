@@ -1419,7 +1419,7 @@ class TestNumpyCircularBuffer(
 
         res = buffer.clip(1, 10)
 
-        self.assertTrue(array_equal(res, test.clip(1, 10)))
+        self.assertTrue(allclose(res, test.clip(1, 10)))
         self.assertIsInstance(res, ndarray)
 
         r = randint(100)
@@ -1428,7 +1428,7 @@ class TestNumpyCircularBuffer(
         test = roll(test, -1)
         res = buffer.clip(1, 10)
 
-        self.assertTrue(array_equal(res, test.clip(1, 10)))
+        self.assertTrue(allclose(res, test.clip(1, 10)))
         self.assertIsInstance(res, ndarray)
 
         r = randint(100)
@@ -1437,7 +1437,7 @@ class TestNumpyCircularBuffer(
         test = roll(test, -1)
         res = buffer.clip(1, 10)
 
-        self.assertTrue(array_equal(res, test.clip(1, 10)))
+        self.assertTrue(allclose(res, test.clip(1, 10)))
         self.assertIsInstance(res, ndarray)
 
         r = randint(100)
@@ -1446,7 +1446,7 @@ class TestNumpyCircularBuffer(
         test = roll(test, -1)
         res = buffer.clip(1, 10)
 
-        self.assertTrue(array_equal(res, test.clip(1, 10)))
+        self.assertTrue(allclose(res, test.clip(1, 10)))
         self.assertIsInstance(res, ndarray)
         self.assertIsNot(buffer, res)
 
@@ -1455,7 +1455,7 @@ class TestNumpyCircularBuffer(
         res = buffer.clip(1, 10)
         inplace_res = buffer.clip(1, 10, out=buffer)
 
-        self.assertTrue(array_equal(res, roll(inplace_res.view(ndarray), -1)))
+        self.assertTrue(allclose(res, roll(inplace_res.view(ndarray), -1)))
         self.assertTrue(shares_memory(inplace_res.data, buffer.data))
         self.assertIsInstance(res, ndarray)
         self.assertIsInstance(inplace_res, ndarray)
