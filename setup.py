@@ -9,9 +9,9 @@ with open("requirements.txt") as fh:
     requirements = fh.readlines()
 
 setuptools.setup(
-    name="silkworm",
+    name="ancb",
     version="0.1.0",
-    author="SIL",
+    author="Drason Chow",
     author_email="drasonchow.business@gmail.com",
     description="Fast, efficient, and powerful NumPy "
                 "compatible circular buffers",
