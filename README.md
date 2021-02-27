@@ -9,7 +9,7 @@ rolling the array into the right order.
 
 ANCB was developed by Drason "Emmy" Chow during their time as an undergraduate researcher at IU: Bloomington for use in 
 making [Savitzky-Golay filters](https://en.wikipedia.org/wiki/Savitzky%E2%80%93Golay_filter), which take an array of positions in chronological or reverse-chronological order and produce
-an estimates of velocity, acceleration, and possibly higher order derivatives if desired.
+estimates of velocity, acceleration, and possibly higher order derivatives if desired.
 
 Looking for the documentation? You can find it here:  
 https://ancb-docs.readthedocs.io/en/latest/
