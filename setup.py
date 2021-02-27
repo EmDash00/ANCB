@@ -10,7 +10,7 @@ with open("requirements.txt") as fh:
 
 setuptools.setup(
     name="silkworm",
-    version="0.1.0b",
+    version="0.1.0",
     author="SIL",
     author_email="drasonchow.business@gmail.com",
     description="Fast, efficient, and powerful NumPy "
