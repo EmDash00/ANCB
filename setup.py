@@ -10,7 +10,7 @@ with open("requirements.txt") as fh:
 
 setuptools.setup(
     name="ancb",
-    version="0.1.0",
+    version="0.1.1",
     author="Drason Chow",
     author_email="drasonchow.business@gmail.com",
     description="Fast, efficient, and powerful NumPy "
