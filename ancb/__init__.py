@@ -894,7 +894,7 @@ class NumpyCircularBuffer(ndarray):
                     )
                 )
 
-    def get_partions(self) -> Union[ndarray, Tuple[ndarray, ndarray]]:
+    def get_partitions(self) -> Union[ndarray, Tuple[ndarray, ndarray]]:
         """
         Gets a slice of the buffer between the beginning and end indices.
         If the buffer is fragmented, a tuple of two slices of the two
@@ -909,7 +909,7 @@ class NumpyCircularBuffer(ndarray):
         if self.fragmented:
             return (self[self._begin:], self[:self._end])
         else:
-            return self[self._begin:self._end]
+            return (self[self._begin:self._end],)
 
     def __add__(self, x):
         x = asarray(x)
