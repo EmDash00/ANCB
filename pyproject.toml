@@ -1,0 +1,32 @@
+[tool.poetry]
+name = "ancb"
+version = "0.1.2"
+description = "Fast, efficient, and powerful NumPy compatible circular buffers."
+authors = ["Ember Chow <emberchow.business@gmail.com>"]
+license = "Apache-2.0"
+documentation = "https://ancb-docs.readthedocs.io/en/latest/"
+readme = "README.md"
+repository = "https://github.com/EmDash00/ANCB"
+classifiers = [
+  "Operating System :: OS Independent",
+]
+
+[tool.poetry.dependencies]
+python = "^3.6"
+numpy = [
+  { version = "^1.16.4", python = ">=3.6" },
+  { version = "^1.20.0", python = ">=3.8,<3.12" },
+  { version = "^1.26.0", python = ">=3.12,<3.13" },
+]
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.pyright]
+venvPath = "."
+venv = ".venv"
+
+[virtualenvs]
+in-project = true
